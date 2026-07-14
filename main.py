@@ -231,6 +231,10 @@ def edit_entry(entry_id):
 
     return redirect(request.referrer or url_for("gallery"))
 
+@app.route("/ping")
+def ping():
+    return "OK", 200
+
 
 @app.route("/delete_entry/<int:entry_id>", methods=["DELETE"])
 def delete_entry(entry_id):
