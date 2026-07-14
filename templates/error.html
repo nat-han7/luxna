@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+
+{% block title %}Fehler{% endblock %}
+
+{% block content %}
+<div style="max-width: 600px; margin: 100px auto; padding: 40px var(--space-4); text-align: center; background: var(--bg-card); border-radius: var(--radius-lg); box-shadow: var(--shadow-card); border: 1px solid var(--border-color);">
+    <i class="fa-solid fa-circle-exclamation" style="font-size: 3rem; color: var(--accent); margin-bottom: var(--space-3); display: block;"></i>
+    <h2 style="margin-bottom: var(--space-2); color: var(--text-main);">{{ error_title }}</h2>
+    <p style="color: var(--text-muted); margin-bottom: var(--space-4); font-size: 1rem; line-height: 1.6;">{{ error_desc }}</p>
+    <a href="javascript:history.back()" class="btn-submit" style="text-decoration: none; display: inline-block; width: auto; padding: 0.75rem 2rem;">Zurück zur vorherigen Seite</a>
+</div>
+{% endblock %}

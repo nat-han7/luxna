@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+
+{% block content %}
+    <section class="hero-section">
+        <h2 id="hero-title" style="margin-bottom: var(--space-2); font-size: 1.5rem;">Zusammen seit...</h2>
+        <div class="hero-counter" id="hero-counter">
+        </div>
+    </section>
+
+    <main class="memories-slider-container">
+        <h3 class="slider-title">
+            <i class="fa-solid fa-sparkles" style="color: #ffd166;"></i> Unsere schönsten gemeinsamen Meilensteine
+        </h3>
+        
+        <div class="entries-slider" id="entries-container">
+            <!-- Skeleton Loader while content is fetched via API -->
+            <div class="memory-card">
+                <div style="height: 240px; background: #eee;" class="skeleton"></div>
+                <div class="card-content">
+                    <div style="height: 20px; width: 60%; background: #eee; margin-bottom: 10px;"></div>
+                    <div style="height: 15px; width: 100%; background: #eee;"></div>
+                </div>
+            </div>
+        </div>
+    </main>
+{% endblock %}

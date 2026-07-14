@@ -1,0 +1,532 @@
+/* =========================================================
+   style.css — Romantisches & Weiches Redesign (Mobile First)
+   ========================================================= */
+
+:root {
+    /* Farbpalette: Weich, romantisch, edel */
+    --rose-petals: #fff0f0;
+    --romantic-blush: #fcdad7;
+    --deep-velvet: #1a2a3a;
+    --soft-grey: #7a8a99;
+    --heart-red: #ff4d6d;
+    --heart-red-hover: #ff758f;
+    --glass-bg: rgba(255, 255, 255, 0.75);
+    --glass-border: rgba(255, 255, 255, 0.5);
+
+    --bg-main: var(--rose-petals);
+    --bg-card: #ffffff;
+    --border-color: #f5dedc;
+    --text-main: var(--deep-velvet);
+    --text-muted: var(--soft-grey);
+    --accent: var(--heart-red);
+
+    /* Abstände & Radien */
+    --radius-sm: 8px;
+    --radius-md: 16px;
+    --radius-lg: 24px;
+    --space-1: 0.25rem;
+    --space-2: 0.5rem;
+    --space-3: 1rem;
+    --space-4: 1.5rem;
+    --space-5: 2rem;
+    
+    --shadow-soft: 0 10px 30px rgba(26, 42, 58, 0.04);
+    --shadow-card: 0 15px 35px rgba(255, 77, 109, 0.06);
+}
+
+[data-theme="dark"] {
+    --bg-main: #12161a;
+    --bg-card: #1a2026;
+    --border-color: #2a343e;
+    --text-main: #e2e8f0;
+    --text-muted: #94a3b8;
+    --glass-bg: rgba(26, 32, 38, 0.8);
+    --glass-border: rgba(255, 255, 255, 0.05);
+    --shadow-soft: 0 10px 30px rgba(0, 0, 0, 0.3);
+    --shadow-card: 0 15px 35px rgba(0, 0, 0, 0.4);
+}
+
+/* Basis-Styles */
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    -webkit-tap-highlight-color: transparent;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background-color: var(--bg-main);
+    color: var(--text-main);
+    line-height: 1.5;
+    transition: background-color 0.4s ease, color 0.4s ease;
+    padding-bottom: 80px; /* Platz für den schwebenden Herz-Button */
+}
+
+/* Header mit Milchglas-Effekt — Garantiert einzeilig */
+.site-header {
+    background: var(--glass-bg);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--glass-border);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    padding: var(--space-3) var(--space-4);
+    box-shadow: var(--shadow-soft);
+}
+
+.header-container {
+    max-width: 800px;
+    margin: 0 auto;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: nowrap; /* Verhindert absolut, dass Elemente in die nächste Zeile rutschen */
+    gap: var(--space-3); /* Schafft einen Sicherheitsabstand zwischen Titel und Buttons */
+}
+
+.brand {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    text-decoration: none;
+    color: var(--text-main);
+    min-width: 0; /* Zwingt die Flexbox, den Titel bei Bedarf schrumpfen zu lassen */
+}
+
+.brand-icon {
+    color: var(--accent);
+    font-size: 1.4rem;
+    animation: pulse 2s infinite;
+    flex-shrink: 0; /* Das Herz-Icon darf niemals gestaucht werden */
+}
+
+.brand-title {
+    font-size: 1.2rem; /* Eine gesunde Größe für Mobile, damit es direkt gut passt */
+    font-weight: 700;
+    white-space: nowrap; /* Text bricht niemals in eine zweite Zeile um */
+    overflow: hidden; /* Schneidet Text ab, der über den Bildschirmrand gehen würde */
+    text-overflow: ellipsis; /* Macht aus "Unser Memorybook" im Notfall "Unser Memory..." statt das Layout zu brechen */
+}
+
+.header-actions {
+    display: flex;
+    align-items: center;
+    white-space: nowrap; /* Verhindert, dass Galerie-Text und Theme-Button trennen */
+    flex-shrink: 0; /* Die Aktions-Buttons behalten immer ihre volle Breite */
+}
+/* Hero-Bereich & Counter */
+.hero-section {
+    max-width: 800px;
+    margin: var(--space-5) auto;
+    padding: 0 var(--space-4);
+    text-align: center;
+}
+
+.hero-counter {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    padding: var(--space-4);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-card);
+    display: inline-flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: var(--space-3);
+}
+
+.counter-segment {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-width: 60px;
+}
+
+.counter-value {
+    font-size: 1.8rem;
+    font-weight: 700;
+    color: var(--text-main);
+}
+
+.counter-label {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+/* Mobile-Carousel / Slider (Swipe-Ansicht für Handy) */
+.memories-slider-container {
+    max-width: 800px;
+    margin: 0 auto var(--space-5) auto;
+    padding: 0 var(--space-4);
+}
+
+.slider-title {
+    font-size: 1.2rem;
+    margin-bottom: var(--space-3);
+    color: var(--text-main);
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+}
+
+.entries-slider {
+    display: flex;
+    gap: var(--space-4);
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    scrollbar-width: none; /* Blendet Scrollbar in Firefox aus */
+    padding-bottom: var(--space-3);
+}
+
+.entries-slider::-webkit-scrollbar {
+    display: none; /* Blendet Scrollbar in Chrome/Safari aus */
+}
+
+/* Aufklappbare Karten */
+.memory-card {
+    flex: 0 0 100%; /* Vollbild-Breite auf Mobile */
+    scroll-snap-align: center;
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    box-shadow: var(--shadow-card);
+    cursor: pointer;
+    transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@media (min-width: 601px) {
+    .memory-card {
+        flex: 0 0 calc(50% - var(--space-2)); /* 2 Spalten auf Tablet/PC im Slider */
+    }
+}
+
+.memory-card:hover {
+    transform: translateY(-4px);
+}
+
+.card-image-wrapper {
+    position: relative;
+    width: 100%;
+    height: 200px; /* Oder deine genutzte Höhe */
+    overflow: hidden; /* Zwingend erforderlich für das Blurring im Inneren! */
+    background-position: center;
+    background-repeat: no-repeat;
+}
+
+.card-image-wrapper img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform 0.5s ease;
+}
+
+.memory-card:hover .card-image-wrapper img {
+    transform: scale(1.05);
+}
+
+.card-content {
+    padding: var(--space-4);
+}
+
+.card-header-flex {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--space-2);
+}
+
+.card-title {
+    font-size: 1.2rem;
+    font-weight: 600;
+}
+
+.card-date {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+}
+
+/* Klapp-Animation für Details */
+.card-details {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.4s cubic-bezier(0.4, 0, 0.2, 1), margin-top 0.4s ease;
+}
+
+.memory-card.is-open .card-details {
+    max-height: 500px; /* Großer Wert, damit der Text reinpasst */
+    margin-top: var(--space-3);
+    border-top: 1px dashed var(--border-color);
+    padding-top: var(--space-3);
+}
+
+.card-text {
+    color: var(--text-main);
+    white-space: pre-line;
+}
+
+/* Schwebender Herz-Button für das Modal */
+.floating-action-btn {
+    position: fixed;
+    bottom: var(--space-4);
+    right: var(--space-4);
+    width: 60px;
+    height: 60px;
+    background: var(--accent);
+    color: #ffffff;
+    border: none;
+    border-radius: 50%;
+    font-size: 1.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 10px 25px rgba(255, 77, 109, 0.4);
+    cursor: pointer;
+    z-index: 90;
+    transition: transform 0.2s, background-color 0.2s;
+}
+
+.floating-action-btn:active {
+    transform: scale(0.9);
+}
+
+/* Das wunderschöne Erstellen-Modal */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(26, 42, 58, 0.4);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    z-index: 200;
+    display: flex;
+    align-items: flex-end; /* Öffnet sich von unten auf Mobile */
+    justify-content: center;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s ease;
+}
+
+.modal-overlay.is-active {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.modal-content {
+    background: var(--bg-card);
+    width: 100%;
+    max-width: 550px;
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+    padding: var(--space-4);
+    box-shadow: 0 -10px 30px rgba(0,0,0,0.1);
+    transform: translateY(100%);
+    transition: transform 0.3s cubic-bezier(0.32, 0.94, 0.6, 1);
+    max-height: 90vh;
+    overflow-y: auto;
+}
+
+@media (min-width: 601px) {
+    .modal-overlay {
+        align-items: center; /* Mittig auf dem Desktop */
+    }
+    .modal-content {
+        border-radius: var(--radius-lg);
+        transform: scale(0.9);
+    }
+}
+
+.modal-overlay.is-active .modal-content {
+    transform: translateY(0) scale(1);
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--space-4);
+}
+
+.close-modal-btn {
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    color: var(--text-muted);
+    cursor: pointer;
+}
+
+/* =========================================================
+   ERWEITERT: Formularelemente, Inputs & File Upload Styles
+   ========================================================= */
+.form-group {
+    margin-bottom: var(--space-3);
+}
+
+.form-group label {
+    display: block;
+    font-size: 0.9rem;
+    font-weight: 600;
+    margin-bottom: var(--space-1);
+    color: var(--text-main);
+}
+
+/* Standard Eingabefelder (Text, Passwort, etc.) */
+.form-control {
+    width: 100%;
+    padding: 0.75rem var(--space-3);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    background: var(--bg-main);
+    color: var(--text-main);
+    font-size: 1rem;
+    font-family: inherit;
+    transition: border-color 0.25s ease, box-shadow 0.25s ease, background-color 0.25s ease;
+}
+
+.form-control:focus {
+    outline: none;
+    border-color: var(--accent);
+    background-color: var(--bg-card);
+    box-shadow: 0 0 0 3px rgba(255, 77, 109, 0.12);
+}
+
+/* Platzhalter Styling */
+.form-control::placeholder {
+    color: var(--text-muted);
+    opacity: 0.6;
+}
+
+/* Spezifische Anpassung für Textareas (Eure Geschichten) */
+textarea.form-control {
+    resize: vertical;
+    min-height: 110px;
+    line-height: 1.4;
+}
+
+/* =========================================================
+   ERWEITERT: Datei-Upload / File Selector Styling
+   ========================================================= */
+input[type="file"].form-control {
+    padding: var(--space-2); /* Etwas schmaleres Padding für den internen Button */
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+}
+
+/* Der native "Datei auswählen"-Button im Browser */
+.form-control::file-selector-button {
+    background: var(--romantic-blush);
+    color: var(--deep-velvet);
+    border: 1px solid transparent;
+    padding: 0.4rem 0.9rem;
+    border-radius: var(--radius-sm);
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    margin-right: var(--space-3);
+    transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.form-control::-webkit-file-upload-button {
+    background: var(--romantic-blush);
+    color: var(--deep-velvet);
+    border: 1px solid transparent;
+    padding: 0.4rem 0.9rem;
+    border-radius: var(--radius-sm);
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    margin-right: var(--space-3);
+    transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+/* Hover-Effekt für den Upload-Button */
+.form-control::file-selector-button:hover,
+.form-control::-webkit-file-upload-button:hover {
+    background-color: var(--accent);
+    color: white;
+}
+
+/* Darkmode-Anpassung für den Upload-Button */
+[data-theme="dark"] .form-control::file-selector-button,
+[data-theme="dark"] .form-control::-webkit-file-upload-button {
+    background: var(--border-color);
+    color: var(--text-main);
+}
+
+[data-theme="dark"] .form-control::file-selector-button:hover,
+[data-theme="dark"] .form-control::-webkit-file-upload-button:hover {
+    background-color: var(--accent);
+    color: white;
+}
+
+/* =========================================================
+   ERWEITERT: Fehlerzustände (z.B. für die Login-Page)
+   ========================================================= */
+.form-control.is-invalid {
+    border-color: var(--accent);
+    background-color: rgba(255, 77, 109, 0.03);
+}
+
+.error-message {
+    color: var(--accent);
+    font-size: 0.85rem;
+    font-weight: 600;
+    margin-top: var(--space-1);
+    display: block;
+}
+
+/* Speicher-/Absendebutton */
+.btn-submit {
+    width: 100%;
+    padding: 0.75rem;
+    background: var(--accent);
+    color: white;
+    border: none;
+    border-radius: var(--radius-md);
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    box-shadow: 0 5px 15px rgba(255, 77, 109, 0.2);
+    transition: background-color 0.2s, transform 0.1s;
+}
+
+.btn-submit:hover {
+    background-color: var(--heart-red-hover);
+}
+
+.btn-submit:active {
+    transform: scale(0.98);
+}
+
+/* Fallback for broken images */
+.card-image-wrapper img.image-error {
+    content: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="%23ff4d6d" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>');
+    object-fit: contain !important;
+    padding: var(--space-5);
+    background: var(--bg-main);
+    box-sizing: border-box;
+}
+
+/* Skeleton loader pulsing effect */
+.skeleton {
+    background: linear-gradient(90deg, var(--border-color) 25%, var(--bg-main) 50%, var(--border-color) 75%);
+    background-size: 200% 100%;
+    animation: skeleton-loading 1.5s infinite;
+}
+
+@keyframes skeleton-loading {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+}
+
+/* Animationen */
+@keyframes pulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.1); }
+    100% { transform: scale(1); }
+}

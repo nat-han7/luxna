@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="de" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Unser Memorybook{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="icon" href="{{ url_for('static', filename='favicon/favicon.ico', v='2') }}" type="image/x-icon">
+    {% block extra_head %}{% endblock %}
+</head>
+<body>
+
+    {% if session.get('logged_in') %}
+    <header class="site-header">
+        <div class="header-container">
+            <a href="/" class="brand">
+                <i class="fa-solid fa-heart brand-icon"></i>
+                <h1 class="brand-title">{% block header_title %}Unser Memorybook{% endblock %}</h1>
+            </a>
+            <div class="header-actions">
+                {% block header_nav %}
+                <a href="/gallery" style="color: var(--text-main); margin-right: var(--space-3); text-decoration: none; font-weight: 600;">
+                    <i class="fa-solid fa-images"></i> Galerie
+                </a>
+                {% endblock %}
+                <button id="theme-toggle-btn" style="background:none; border:none; font-size:1.2rem; cursor:pointer; color:var(--text-main);">
+                    <i class="fa-solid fa-moon"></i>
+                </button>
+            </div>
+        </div>
+    </header>
+    {% endif %}
+
+    {% block content %}{% endblock %}
+
+    {% if session.get('logged_in') %}
+    <!-- Floating button to trigger add entry modal -->
+    <button class="floating-action-btn" id="open-modal-btn">
+        <i class="fa-solid fa-plus"></i>
+    </button>
+
+    <!-- Create Entry Modal -->
+    <div class="modal-overlay" id="entry-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Einen neuen Moment für uns festhalten</h3>
+                <button class="close-modal-btn" id="close-modal-btn">&times;</button>
+            </div>
+            <form action="/add_entry" method="POST" enctype="multipart/form-data">
+                <div class="form-group">
+                    <label for="title">Was haben wir Schönes gemacht?</label>
+                    <input type="text" id="title" name="title" class="form-control" placeholder="Unser spontaner Roadtrip nach..." required>
+                </div>
+                <div class="form-group">
+                    <label for="text">Was willst du niemals vergessen?</label>
+                    <textarea id="text" name="text" class="form-control" rows="4" placeholder="Ich weiß noch genau, wie glücklich wir da waren, weil..." required></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="media">Das schönste Foto dazu</label>
+                    <input type="file" id="media" name="media" class="form-control" accept="image/*,image/heic" required>
+                </div>
+                <div class="form-group">
+                    <label for="date">Wann war das?</label>
+                    <input type="date" id="date" name="date" class="form-control" style="width:90%;" required>
+                </div>
+                <button type="submit" class="btn-submit">Erinnerung sichern <i class="fa-solid fa-heart"></i></button>
+            </form>
+        </div>
+    </div>
+    
+    <!-- Detail View Modal -->
+    <div class="modal-overlay" id="detail-modal">
+        <div class="modal-content" style="max-width: 700px;">
+            <div class="modal-header">
+                <h3 id="detail-title">Erinnerung</h3>
+                <button class="close-modal-btn" id="close-detail-btn">&times;</button>
+            </div>
+            <div id="detail-image-container"></div>
+            <p id="detail-date" style="color: var(--text-muted); margin: var(--space-2) 0; font-size: 0.9rem;"></p>
+            <p id="detail-text" style="white-space: pre-line; margin-bottom: var(--space-4);"></p>
+            
+            <div style="display: flex; gap: var(--space-2);">
+                <button id="detail-edit-btn" class="btn-submit" style="background: var(--soft-grey); width: auto; padding: 0.75rem 1.5rem;">Bearbeiten <i class="fa-solid fa-pen"></i></button>
+                <button id="detail-delete-btn" class="btn-submit" style="background: var(--heart-red); width: auto; padding: 0.75rem 1.5rem;">Löschen <i class="fa-solid fa-trash"></i></button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Entry Modal -->
+    <div class="modal-overlay" id="edit-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Erinnerung bearbeiten</h3>
+                <button class="close-modal-btn" id="close-edit-btn">&times;</button>
+            </div>
+            <form id="edit-form" method="POST" enctype="multipart/form-data">
+                <div class="form-group">
+                    <label for="edit-title">Was haben wir Schönes gemacht?</label>
+                    <input type="text" id="edit-title" name="title" class="form-control" required>
+                </div>
+                <div class="form-group">
+                    <label for="edit-text">Was willst du niemals vergessen?</label>
+                    <textarea id="edit-text" name="text" class="form-control" rows="4" required></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="edit-media">Foto ändern (optional)</label>
+                    <input type="file" id="edit-media" name="media" class="form-control" accept="image/*,image/heic">
+                </div>
+                <div class="form-group">
+                    <label for="edit-date">Wann war das?</label>
+                    <input type="date" id="edit-date" name="date" class="form-control" style="width:90%;" required>
+                </div>
+                <button type="submit" class="btn-submit">Änderungen speichern <i class="fa-solid fa-heart"></i></button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Context Menu for cards -->
+    <div id="context-menu" style="display: none; position: absolute; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-md); box-shadow: var(--shadow-soft); z-index: 1000; overflow: hidden;">
+        <div id="context-edit" style="padding: var(--space-3) var(--space-4); cursor: pointer; font-weight: 600;"><i class="fa-solid fa-pen" style="margin-right: 8px;"></i> Bearbeiten</div>
+        <div id="context-delete" style="padding: var(--space-3) var(--space-4); cursor: pointer; color: var(--heart-red); font-weight: 600; border-top: 1px solid var(--border-color);"><i class="fa-solid fa-trash" style="margin-right: 8px;"></i> Löschen</div>
+    </div>
+    {% endif %}
+
+    <script>
+        const savedTheme = localStorage.getItem('theme') || 'light';
+        document.documentElement.setAttribute('data-theme', savedTheme);
+    </script>
+    
+    {% if session.get('logged_in') %}
+    <script src="{{ url_for('static', filename='js/index.js') }}"></script>
+    {% endif %}
+    
+    {% block scripts %}{% endblock %}
+</body>
+</html>

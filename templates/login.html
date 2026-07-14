@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+
+{% block title %}Unser Memorybook - Login{% endblock %}
+
+{% block extra_head %}
+    <style>
+        .login-page-container {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: var(--space-4);
+            background-color: var(--bg-main);
+        }
+
+        .login-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow-card);
+            width: 100%;
+            max-width: 360px;
+            padding: var(--space-5) var(--space-4);
+            text-align: center;
+            animation: loginFadeIn 0.5s cubic-bezier(0.25, 1, 0.5, 1);
+        }
+
+        .login-icon {
+            color: var(--accent);
+            font-size: 2.2rem;
+            margin-bottom: var(--space-2);
+            animation: heartPulse 2s infinite;
+            display: inline-block;
+        }
+
+        .login-title {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--text-main);
+            margin-bottom: var(--space-4);
+        }
+
+        .login-error {
+            color: var(--accent);
+            font-size: 0.85rem;
+            font-weight: 600;
+            background: rgba(255, 82, 116, 0.1);
+            padding: var(--space-2);
+            border-radius: var(--radius-md);
+            margin-bottom: var(--space-3);
+            text-align: center;
+        }
+
+        @keyframes loginFadeIn {
+            from { opacity: 0; transform: translateY(15px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+{% endblock %}
+
+{% block content %}
+    <div class="login-page-container">
+        <div class="login-card">
+            
+            <div class="login-icon">
+                <i class="fa-solid fa-heart-lock"></i>
+            </div>
+            
+            <h2 class="login-title">Unser Memorybook</h2>
+
+            {% if error %}
+                <div class="login-error">
+                    <i class="fa-solid fa-circle-exclamation"></i> {{ error }}
+                </div>
+            {% endif %}
+
+            <form method="POST" style="text-align: left;">
+                <div class="form-group">
+                    <label for="password" style="color: var(--text-muted); font-size: 0.85rem;">Gib hier unseren Geheimcode ein</label>
+                    <input 
+                        type="password" 
+                        id="password" 
+                        name="password" 
+                        class="form-control" 
+                        placeholder="••••••••" 
+                        style="text-align: center; letter-spacing: 0.1em;"
+                        required
+                        autofocus
+                    >
+                </div>
+                
+                <button type="submit" class="btn-submit">
+                    Öffnen <i class="fa-solid fa-heart" style="margin-left: 4px;"></i>
+                </button>
+            </form>
+
+        </div>
+    </div>
+{% endblock %}
