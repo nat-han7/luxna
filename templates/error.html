@@ -1,12 +1,48 @@
 {% extends "base.html" %}
 
-{% block title %}Fehler{% endblock %}
+{% block title %}{{ error_title | default('Ups, da ist etwas schiefgelaufen') }}{% endblock %}
 
 {% block content %}
-<div style="max-width: 600px; margin: 100px auto; padding: 40px var(--space-4); text-align: center; background: var(--bg-card); border-radius: var(--radius-lg); box-shadow: var(--shadow-card); border: 1px solid var(--border-color);">
-    <i class="fa-solid fa-circle-exclamation" style="font-size: 3rem; color: var(--accent); margin-bottom: var(--space-3); display: block;"></i>
-    <h2 style="margin-bottom: var(--space-2); color: var(--text-main);">{{ error_title }}</h2>
-    <p style="color: var(--text-muted); margin-bottom: var(--space-4); font-size: 1rem; line-height: 1.6;">{{ error_desc }}</p>
-    <a href="javascript:history.back()" class="btn-submit" style="text-decoration: none; display: inline-block; width: auto; padding: 0.75rem 2rem;">Zurück zur vorherigen Seite</a>
+{% set code = error_code | default(500) %}
+{% set icons = {
+    400: 'fa-solid fa-triangle-exclamation',
+    401: 'fa-solid fa-lock',
+    403: 'fa-solid fa-user-lock',
+    404: 'fa-solid fa-heart-crack',
+    413: 'fa-solid fa-file-circle-exclamation',
+    429: 'fa-solid fa-hourglass-half',
+    500: 'fa-solid fa-circle-exclamation',
+    503: 'fa-solid fa-plug-circle-xmark'
+} %}
+{% set icon = icons.get(code, 'fa-solid fa-circle-exclamation') %}
+
+<div style="min-height: 70vh; display:flex; align-items:center; justify-content:center; padding: var(--space-4);">
+    <div style="max-width: 480px; width:100%; padding: 40px var(--space-4); text-align: center; background: var(--bg-card); border-radius: var(--radius-lg); box-shadow: var(--shadow-card); border: 1px solid var(--border-color);">
+
+        <i class="{{ icon }}" style="font-size: 3rem; color: var(--accent); margin-bottom: var(--space-3); display: block;"></i>
+
+        {% if error_code %}
+        <div style="font-size: 0.85rem; font-weight: 700; letter-spacing: 0.08em; color: var(--text-muted); margin-bottom: var(--space-2);">
+            FEHLER {{ error_code }}
+        </div>
+        {% endif %}
+
+        <h2 style="margin-bottom: var(--space-2); color: var(--text-main);">
+            {{ error_title | default('Ups, da ist etwas schiefgelaufen') }}
+        </h2>
+
+        <p style="color: var(--text-muted); margin-bottom: var(--space-4); font-size: 1rem; line-height: 1.6;">
+            {{ error_desc | default('Diese Seite konnte leider nicht gefunden werden. Vielleicht ist die Erinnerung woanders versteckt?') }}
+        </p>
+
+        <div style="display:flex; gap: var(--space-2); flex-wrap: wrap; justify-content:center;">
+            <a href="javascript:history.back()" class="btn-submit" style="text-decoration: none; display: inline-block; width: auto; padding: 0.75rem 2rem;">
+                Zurück
+            </a>
+            <a href="/" class="btn-submit" style="text-decoration: none; display: inline-block; width: auto; padding: 0.75rem 2rem; background: var(--soft-grey);">
+                <i class="fa-solid fa-house"></i> Zur Startseite
+            </a>
+        </div>
+    </div>
 </div>
 {% endblock %}

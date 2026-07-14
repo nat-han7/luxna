@@ -254,19 +254,85 @@ def delete_entry(entry_id):
     return jsonify({"success": True})
 
 
-@app.errorhandler(413)
-def request_entity_too_large(error):
-    """Graceful error handler for files exceeding the 16MB limit."""
+# ---------------------------------------------------------------------------
+# Error handling
+# ---------------------------------------------------------------------------
+ERROR_MESSAGES = {
+    400: ("Ungültige Anfrage", "Da ist wohl etwas durcheinandergeraten. Versuch es bitte nochmal."),
+    401: ("Nicht angemeldet", "Bitte melde dich zuerst an, um diese Seite zu sehen."),
+    403: ("Kein Zutritt", "Du hast leider keinen Zugriff auf diesen Bereich."),
+    404: ("Seite nicht gefunden", "Diese Erinnerung scheint es nicht (mehr) zu geben."),
+    413: ("Datei zu groß", "Das hochgeladene Foto ist leider größer als die erlaubten 16 MB. Bitte verkleinere es und versuche es erneut."),
+    429: ("Zu viele Versuche", "Bitte warte einen Moment, bevor du es erneut versuchst."),
+    500: ("Serverfehler", "Etwas ist bei uns schiefgelaufen. Bitte versuch es später nochmal."),
+    503: ("Kurz nicht erreichbar", "Der Dienst ist gerade nicht verfügbar. Versuch es gleich nochmal."),
+}
+
+
+def handle_error(code):
+    """Renders error.html for normal requests, JSON for /api/ requests."""
+    title, desc = ERROR_MESSAGES.get(code, ("Unbekannter Fehler", "Etwas ist schiefgelaufen."))
+
     if request.path.startswith("/api/"):
-        return jsonify({"error": "Die Datei ist zu groß (max. 16MB)."}), 413
+        return jsonify({"error": title, "detail": desc}), code
+
     return (
         render_template(
             "error.html",
-            error_title="Datei zu groß",
-            error_desc="Das hochgeladene Foto ist leider größer als die erlaubten 16 MB. Bitte verkleinere es und versuche es erneut.",
+            error_code=code,
+            error_title=title,
+            error_desc=desc,
         ),
-        413,
+        code,
     )
+
+
+@app.errorhandler(400)
+def bad_request(e):
+    return handle_error(400)
+
+
+@app.errorhandler(401)
+def unauthorized(e):
+    return handle_error(401)
+
+
+@app.errorhandler(403)
+def forbidden(e):
+    return handle_error(403)
+
+
+@app.errorhandler(404)
+def not_found(e):
+    return handle_error(404)
+
+
+@app.errorhandler(413)
+def request_entity_too_large(e):
+    """Graceful error handler for files exceeding the 16MB limit."""
+    return handle_error(413)
+
+
+@app.errorhandler(429)
+def too_many_requests(e):
+    return handle_error(429)
+
+
+@app.errorhandler(500)
+def server_error(e):
+    return handle_error(500)
+
+
+@app.errorhandler(503)
+def service_unavailable(e):
+    return handle_error(503)
+
+
+@app.errorhandler(Exception)
+def unhandled_exception(e):
+    """Catch-all for anything not explicitly handled above, so users never see a raw traceback."""
+    app.logger.error(f"Unhandled exception: {e}")
+    return handle_error(500)
 
 
 if __name__ == "__main__":
