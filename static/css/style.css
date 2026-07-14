@@ -512,6 +512,16 @@ input[type="file"].form-control {
     box-sizing: border-box;
 }
 
+/* Skeleton placeholder cards: no hover-lift or pointer cursor while loading */
+.skeleton-card {
+    cursor: default;
+    pointer-events: none;
+}
+
+.skeleton-card:hover {
+    transform: none;
+}
+
 /* Skeleton loader pulsing effect */
 .skeleton {
     background: linear-gradient(90deg, var(--border-color) 25%, var(--bg-main) 50%, var(--border-color) 75%);

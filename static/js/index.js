@@ -179,7 +179,10 @@ function loadEntries() {
             }
             setupInteractionFeatures();
         })
-        .catch(err => console.error("Fehler beim Laden:", err));
+        .catch(err => {
+            console.error("Fehler beim Laden:", err);
+            container.innerHTML = `<p style="text-align:center; color:var(--text-muted); width:100%; padding: var(--space-4);">Die Erinnerungen konnten gerade nicht geladen werden. Bitte lade die Seite neu.</p>`;
+        });
 }
 
 function openDetailModal(entry) {
