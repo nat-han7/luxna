@@ -84,6 +84,49 @@ function setupModal() {
 let currentSelectedEntry = null;
 let globalEntriesData = [];
 
+function getEntryIdFromUrl() {
+    const value = new URLSearchParams(window.location.search).get('id');
+    const parsed = parseInt(value, 10);
+    return Number.isNaN(parsed) ? null : parsed;
+}
+
+function clearEntryIdFromUrl() {
+    const url = new URL(window.location.href);
+    if (!url.searchParams.has('id')) return;
+    url.searchParams.delete('id');
+    history.replaceState({}, '', url);
+}
+
+function getReminderTargetName() {
+    return window.currentUser === 'nathan' ? 'Luisa' : 'Nathan';
+}
+
+function updateReminderButtonLabel() {
+    const button = document.getElementById('detail-remind-btn');
+    const targetName = getReminderTargetName();
+    if (button) {
+        button.innerHTML = `Mit ${targetName} erinnern <i class="fa-solid fa-bell"></i>`;
+    }
+}
+
+function closeDetailModal() {
+    document.getElementById('detail-modal')?.classList.remove('is-active');
+    clearEntryIdFromUrl();
+}
+
+function closeReminderModal() {
+    document.getElementById('remind-modal')?.classList.remove('is-active');
+}
+
+function openReminderModal(entry) {
+    if (!entry) return;
+    currentSelectedEntry = entry;
+    document.getElementById('remind-message').value = '';
+    document.getElementById('remind-modal-title').textContent = `Mit ${getReminderTargetName()} erinnern`;
+    document.getElementById('detail-modal')?.classList.remove('is-active');
+    document.getElementById('remind-modal').classList.add('is-active');
+}
+
 function setupLazyLoading() {
     const images = document.querySelectorAll('.card-image-wrapper img[data-src]');
 
@@ -178,6 +221,14 @@ function loadEntries() {
                 setupLazyLoading();
             }
             setupInteractionFeatures();
+
+            const requestedEntryId = getEntryIdFromUrl();
+            if (requestedEntryId) {
+                const requestedEntry = data.entries.find(entry => entry.id === requestedEntryId);
+                if (requestedEntry) {
+                    openDetailModal(requestedEntry);
+                }
+            }
         })
         .catch(err => {
             console.error("Fehler beim Laden:", err);
@@ -190,6 +241,7 @@ function openDetailModal(entry) {
     document.getElementById('detail-title').textContent = entry.title;
     document.getElementById('detail-date').textContent = formatDateForDisplay(entry.date);
     document.getElementById('detail-text').textContent = entry.text;
+    updateReminderButtonLabel();
     
     const imgContainer = document.getElementById('detail-image-container');
     
@@ -258,7 +310,7 @@ function setupInteractionFeatures() {
                 e.preventDefault();
                 return;
             }
-            openDetailModal(entry);
+            window.location.href = `/gallery?id=${entry.id}`;
         });
     });
 }
@@ -289,11 +341,13 @@ function deleteEntryHandler(entryId) {
 }
 
 function setupManagementModals() {
-    document.getElementById('close-detail-btn')?.addEventListener('click', () => document.getElementById('detail-modal').classList.remove('is-active'));
+    document.getElementById('close-detail-btn')?.addEventListener('click', closeDetailModal);
     document.getElementById('close-edit-btn')?.addEventListener('click', () => document.getElementById('edit-modal').classList.remove('is-active'));
+    document.getElementById('close-remind-modal-btn')?.addEventListener('click', closeReminderModal);
 
     document.getElementById('detail-edit-btn')?.addEventListener('click', () => openEditModal(currentSelectedEntry));
     document.getElementById('detail-delete-btn')?.addEventListener('click', () => deleteEntryHandler(currentSelectedEntry.id));
+    document.getElementById('detail-remind-btn')?.addEventListener('click', () => openReminderModal(currentSelectedEntry));
 
     document.getElementById('context-edit')?.addEventListener('click', () => openEditModal(currentSelectedEntry));
     document.getElementById('context-delete')?.addEventListener('click', () => deleteEntryHandler(currentSelectedEntry.id));
@@ -352,41 +406,130 @@ function urlBase64ToUint8Array(base64String) {
 
 const VAPID_PUBLIC_KEY = "BJ4spcyHbbYUVPNydj2awOhbFg5G1D3pPhHcvFjouMNoikZKakB0sjxn-UBRhibHueVcVhSsMoFga0YIddTkwbc";
 
-async function initPushNotifications() {
-    if ('serviceWorker' in navigator && 'PushManager' in window) {
-        try {
-            // 1. Service Worker registrieren
-            const register = await navigator.serviceWorker.register('/sw.js');
-            console.log('Service Worker registriert.');
+let pushServiceWorkerRegistration = null;
 
-            // 2. Erlaubnis abfragen
-            const permission = await Notification.requestPermission();
-            if (permission !== 'granted') {
-                console.log('Benachrichtigungs-Erlaubnis verweigert.');
-                return;
-            }
+function canUsePushNotifications() {
+    return 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
+}
 
-            // 3. Push-Abonnement erstellen
-            let subscription = await register.pushManager.getSubscription();
-            if (!subscription) {
-                subscription = await register.pushManager.subscribe({
-                    userVisibleOnly: true,
-                    applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
-                });
-            }
+function openPushModal(message) {
+    const modal = document.getElementById('push-modal');
+    const text = document.getElementById('push-modal-text');
+    if (text && message) {
+        text.textContent = message;
+    }
+    if (modal) {
+        modal.classList.add('is-active');
+    }
+}
 
-            // 4. Abo-Daten an Flask-Backend senden
-            await fetch('/api/subscribe', {
-                method: 'POST',
-                body: JSON.stringify(subscription),
-                headers: {
-                    'Content-Type': 'application/json'
-                }
-            });
-            console.log('Push-Abo erfolgreich an Server übertragen.');
-        } catch (error) {
-            console.error('Fehler bei der Push-Registrierung:', error);
+function closePushModal() {
+    document.getElementById('push-modal')?.classList.remove('is-active');
+}
+
+async function registerPushServiceWorker() {
+    if (!pushServiceWorkerRegistration) {
+        pushServiceWorkerRegistration = await navigator.serviceWorker.register('/sw.js');
+        console.log('Service Worker registriert.');
+    }
+    return pushServiceWorkerRegistration;
+}
+
+async function syncPushSubscription(subscription) {
+    await fetch('/api/subscribe', {
+        method: 'POST',
+        body: JSON.stringify(subscription),
+        headers: {
+            'Content-Type': 'application/json'
         }
+    });
+    console.log('Push-Abo erfolgreich an Server übertragen.');
+}
+
+async function enablePushNotifications() {
+    if (!canUsePushNotifications()) {
+        openPushModal('Dein Browser unterstützt Push-Benachrichtigungen nicht.');
+        return;
+    }
+
+    try {
+        const register = await registerPushServiceWorker();
+        const permission = await Notification.requestPermission();
+        if (permission !== 'granted') {
+            openPushModal('Ohne erlaubte Benachrichtigungen kann ich nichts schicken. Bitte erlaube Push-Benachrichtigungen.');
+            return;
+        }
+
+        let subscription = await register.pushManager.getSubscription();
+        if (!subscription) {
+            subscription = await register.pushManager.subscribe({
+                userVisibleOnly: true,
+                applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
+            });
+        }
+
+        await syncPushSubscription(subscription);
+        closePushModal();
+    } catch (error) {
+        console.error('Fehler bei der Push-Registrierung:', error);
+        openPushModal('Die Aktivierung ist fehlgeschlagen. Bitte versuche es noch einmal.');
+    }
+}
+
+async function initPushNotifications() {
+    if (!canUsePushNotifications()) {
+        return;
+    }
+
+    try {
+        const register = await registerPushServiceWorker();
+        const subscription = await register.pushManager.getSubscription();
+
+        if (subscription) {
+            await syncPushSubscription(subscription);
+            return;
+        }
+
+        if (Notification.permission === 'granted') {
+            openPushModal('Benachrichtigungen sind noch nicht eingerichtet. Bitte aktiviere sie einmal per Klick.');
+            return;
+        }
+
+        if (Notification.permission === 'default') {
+            openPushModal('Damit iOS Push-Benachrichtigungen zulässt, musst du sie per Klick aktivieren.');
+            return;
+        }
+
+        openPushModal('Benachrichtigungen sind im Browser deaktiviert. Bitte aktiviere sie in den Einstellungen oder per Klick hier.');
+    } catch (error) {
+        console.error('Fehler beim Vorbereiten der Push-Benachrichtigungen:', error);
+    }
+}
+
+async function sendReminderPush() {
+    if (!currentSelectedEntry) return;
+
+    const messageInput = document.getElementById('remind-message');
+    const message = messageInput ? messageInput.value.trim() : '';
+
+    try {
+        const response = await fetch(`/api/remind/${currentSelectedEntry.id}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ message })
+        });
+
+        const data = await response.json();
+        if (!response.ok || !data.success) {
+            throw new Error(data.error || 'Reminder konnte nicht gesendet werden.');
+        }
+
+        closeReminderModal();
+    } catch (error) {
+        console.error('Fehler beim Erinnern:', error);
+        openPushModal('Die Erinnerung konnte nicht gesendet werden. Bitte versuche es noch einmal.');
     }
 }
 
@@ -406,4 +549,18 @@ document.addEventListener('DOMContentLoaded', () => {
     loadEntries();
     setupTheme();
     initPushNotifications();
+
+    document.getElementById('enable-push-btn')?.addEventListener('click', enablePushNotifications);
+    document.getElementById('close-push-modal-btn')?.addEventListener('click', closePushModal);
+    document.getElementById('send-remind-btn')?.addEventListener('click', sendReminderPush);
+    document.getElementById('push-modal')?.addEventListener('click', (e) => {
+        if (e.target.id === 'push-modal') {
+            closePushModal();
+        }
+    });
+    document.getElementById('remind-modal')?.addEventListener('click', (e) => {
+        if (e.target.id === 'remind-modal') {
+            closeReminderModal();
+        }
+    });
 });

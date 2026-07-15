@@ -87,6 +87,7 @@
             <p id="detail-text" style="white-space: pre-line; margin-bottom: var(--space-4);"></p>
             
             <div style="display: flex; gap: var(--space-2);">
+                <button id="detail-remind-btn" class="btn-submit" style="background: #2f855a; width: auto; padding: 0.75rem 1.5rem;">Mit Luisa/Nathan erinnern <i class="fa-solid fa-bell"></i></button>
                 <button id="detail-edit-btn" class="btn-submit" style="background: var(--soft-grey); width: auto; padding: 0.75rem 1.5rem;">Bearbeiten <i class="fa-solid fa-pen"></i></button>
                 <button id="detail-delete-btn" class="btn-submit" style="background: var(--heart-red); width: auto; padding: 0.75rem 1.5rem;">Löschen <i class="fa-solid fa-trash"></i></button>
             </div>
@@ -127,11 +128,48 @@
         <div id="context-edit" style="padding: var(--space-3) var(--space-4); cursor: pointer; font-weight: 600;"><i class="fa-solid fa-pen" style="margin-right: 8px;"></i> Bearbeiten</div>
         <div id="context-delete" style="padding: var(--space-3) var(--space-4); cursor: pointer; color: var(--heart-red); font-weight: 600; border-top: 1px solid var(--border-color);"><i class="fa-solid fa-trash" style="margin-right: 8px;"></i> Löschen</div>
     </div>
+
+    <!-- Reminder Modal -->
+    <div class="modal-overlay" id="remind-modal">
+        <div class="modal-content" style="max-width: 520px;">
+            <div class="modal-header">
+                <h3 id="remind-modal-title">Mit Luisa/Nathan erinnern</h3>
+                <button class="close-modal-btn" id="close-remind-modal-btn">&times;</button>
+            </div>
+            <p style="margin-bottom: var(--space-3); color: var(--text-muted);">
+                Du kannst eine optionale Nachricht dazuschreiben. Die Push führt direkt zu diesem Eintrag.
+            </p>
+            <div class="form-group">
+                <label for="remind-message">Nachricht</label>
+                <textarea id="remind-message" class="form-control" rows="4" placeholder="Zum Beispiel: Schau dir mal diesen Moment an..." style="width: 100%;"></textarea>
+            </div>
+            <button id="send-remind-btn" class="btn-submit" style="width: 100%;">
+                Erinnern <i class="fa-solid fa-bell"></i>
+            </button>
+        </div>
+    </div>
+
+    <!-- Push Notification Prompt -->
+    <div class="modal-overlay" id="push-modal">
+        <div class="modal-content" style="max-width: 520px;">
+            <div class="modal-header">
+                <h3>Benachrichtigungen aktivieren</h3>
+                <button class="close-modal-btn" id="close-push-modal-btn">&times;</button>
+            </div>
+            <p id="push-modal-text" style="margin-bottom: var(--space-4); color: var(--text-main);">
+                Damit iOS Benachrichtigungen zulässt, musst du sie per Klick aktivieren. Danach bleiben sie für neue Erinnerungen eingeschaltet.
+            </p>
+            <button id="enable-push-btn" class="btn-submit" style="width: 100%;">
+                Benachrichtigungen aktivieren <i class="fa-solid fa-bell"></i>
+            </button>
+        </div>
+    </div>
     {% endif %}
 
     <script>
         const savedTheme = localStorage.getItem('theme') || 'light';
         document.documentElement.setAttribute('data-theme', savedTheme);
+        window.currentUser = "{{ session.get('user', '') }}";
     </script>
     
     {% if session.get('logged_in') %}

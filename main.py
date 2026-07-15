@@ -160,6 +160,14 @@ def gallery():
     return render_template("gallery.html")
 
 
+def get_other_user(username):
+    if username == "nathan":
+        return "luisa"
+    if username == "luisa":
+        return "nathan"
+    return None
+
+
 @app.route("/add_entry", methods=["POST"])
 def add_entry():
     if not is_logged_in():
@@ -280,17 +288,24 @@ def subscribe():
     if not subscription_data:
         return jsonify({"error": "Invalid subscription data"}), 400
 
-    # In Supabase speichern (oder updaten, falls schon vorhanden)
+    endpoint = subscription_data.get("endpoint")
+    if not endpoint:
+        return jsonify({"error": "Invalid subscription endpoint"}), 400
+
     try:
-        # Prüfen, ob für diesen User dieses Abo schon existiert
-        endpoint = subscription_data.get("endpoint")
-        res = supabase.table("push_subscriptions").select("*").eq("user", current_user).execute()
-        
-        # Einfachheitshalber speichern wir das neue Abo ab
-        supabase.table("push_subscriptions").insert({
-            "user": current_user,
-            "subscription_data": subscription_data
-        }).execute()
+        res = supabase.table("push_subscriptions").select("id").eq("endpoint", endpoint).execute()
+
+        if res.data:
+            supabase.table("push_subscriptions").update({
+                "user": current_user,
+                "subscription_data": subscription_data
+            }).eq("endpoint", endpoint).execute()
+        else:
+            supabase.table("push_subscriptions").insert({
+                "user": current_user,
+                "endpoint": endpoint,
+                "subscription_data": subscription_data
+            }).execute()
         
         return jsonify({"success": True})
     except Exception as e:
@@ -324,8 +339,13 @@ def send_push_notifications(title, message, url_path="/gallery"):
         "url": url_path
     })
 
+    seen_endpoints = set()
     for sub in subscriptions:
         sub_data = sub.get("subscription_data")
+        endpoint = (sub_data or {}).get("endpoint")
+        if not endpoint or endpoint in seen_endpoints:
+            continue
+        seen_endpoints.add(endpoint)
         try:
             webpush(
                 subscription_info=sub_data,
@@ -340,6 +360,86 @@ def send_push_notifications(title, message, url_path="/gallery"):
                 supabase.table("push_subscriptions").delete().eq("id", sub.get("id")).execute()
         except Exception as e:
             app.logger.error(f"Unexpected push error: {e}")
+
+
+def send_push_notifications_to_user(username, title, message, url_path="/gallery"):
+    try:
+        res = supabase.table("push_subscriptions").select("*").eq("user", username).execute()
+        subscriptions = res.data or []
+    except Exception as e:
+        app.logger.error(f"Failed to fetch user subscriptions for push: {e}")
+        return
+
+    vapid_private = os.environ["VAPID_PRIVATE_KEY"]
+    vapid_contact = os.environ.get("VAPID_MAILTO", "").strip().strip('"').strip("'")
+    if not vapid_contact:
+        app.logger.error("VAPID_MAILTO is missing; cannot send push notifications.")
+        return
+    if not vapid_contact.startswith("mailto:"):
+        vapid_contact = f"mailto:{vapid_contact}"
+
+    vapid_claims = {"sub": vapid_contact}
+    payload = json.dumps({
+        "title": title,
+        "body": message,
+        "url": url_path
+    })
+
+    seen_endpoints = set()
+    for sub in subscriptions:
+        sub_data = sub.get("subscription_data")
+        endpoint = (sub_data or {}).get("endpoint")
+        if not endpoint or endpoint in seen_endpoints:
+            continue
+        seen_endpoints.add(endpoint)
+        try:
+            webpush(
+                subscription_info=sub_data,
+                data=payload,
+                vapid_private_key=vapid_private,
+                vapid_claims=vapid_claims
+            )
+        except WebPushException as ex:
+            app.logger.error(f"WebPush error: {ex}")
+            if ex.response and ex.response.status_code in [410, 404]:
+                supabase.table("push_subscriptions").delete().eq("id", sub.get("id")).execute()
+        except Exception as e:
+            app.logger.error(f"Unexpected push error: {e}")
+
+
+@app.route("/api/remind/<int:entry_id>", methods=["POST"])
+def remind_entry(entry_id):
+    if not is_logged_in():
+        return jsonify({"error": "Unauthorized"}), 401
+
+    current_user = session.get("user")
+    target_user = get_other_user(current_user)
+    if not target_user:
+        return jsonify({"error": "Unknown user"}), 400
+
+    payload = request.get_json(silent=True) or {}
+    custom_message = (payload.get("message") or "").strip()
+
+    try:
+        res = supabase.table("journal_entry").select("*").eq("id", entry_id).execute()
+        if not res.data:
+            return jsonify({"error": "Entry not found"}), 404
+        entry = res.data[0]
+    except Exception as e:
+        app.logger.error(f"Failed to fetch entry for reminder: {e}")
+        return jsonify({"error": "Database error"}), 500
+
+    title = f"{current_user.capitalize()} erinnert dich an einen Moment"
+    body = custom_message if custom_message else f"Schau dir diesen Moment an: {entry.get('title', 'Erinnerung')}"
+    entry_url = f"/gallery?id={entry_id}"
+
+    threading.Thread(
+        target=send_push_notifications_to_user,
+        args=(target_user, title, body, entry_url),
+        daemon=True,
+    ).start()
+
+    return jsonify({"success": True})
 
 
 # ---------------------------------------------------------------------------
