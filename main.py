@@ -282,11 +282,14 @@ def subscribe():
     if not is_logged_in():
         return jsonify({"error": "Unauthorized"}), 401
 
-    subscription_data = request.get_json()
-    current_user = session.get("user")
+    payload = request.get_json(silent=True) or {}
+    subscription_data = payload.get("subscription") or payload
+    current_user = session.get("user") or payload.get("user")
 
     if not subscription_data:
         return jsonify({"error": "Invalid subscription data"}), 400
+    if not current_user:
+        return jsonify({"error": "Missing user"}), 400
 
     endpoint = subscription_data.get("endpoint")
     if not endpoint:

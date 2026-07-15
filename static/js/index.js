@@ -436,9 +436,14 @@ async function registerPushServiceWorker() {
 }
 
 async function syncPushSubscription(subscription) {
+    const payload = {
+        user: window.currentUser || null,
+        subscription: subscription
+    };
+
     await fetch('/api/subscribe', {
         method: 'POST',
-        body: JSON.stringify(subscription),
+        body: JSON.stringify(payload),
         headers: {
             'Content-Type': 'application/json'
         }
