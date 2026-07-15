@@ -4,3 +4,4 @@ pi-heif
 supabase
 python-dotenv
 gunicorn
+pywebpush

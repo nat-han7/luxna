@@ -8,6 +8,9 @@ from PIL import Image
 import pi_heif
 from supabase import create_client, Client
 from dotenv import load_dotenv
+from pywebpush import webpush, WebPushException
+import json
+import threading
 
 # Loads a local ".env" file if present
 load_dotenv()
@@ -21,8 +24,9 @@ app = Flask(__name__)
 # Secrets & config
 # ---------------------------------------------------------------------------
 app.secret_key = os.environ["SECRET_KEY"]
-LOGIN_PASSWORD = os.environ["LOGIN_PASSWORD"]
-app.config["MAX_CONTENT_LENGTH"] = 16 * 1024 * 1024  # 16 MB limit
+NA_LOGIN_PASSWORD = os.environ["NA_LOGIN_PASSWORD"]
+LU_LOGIN_PASSWORD = os.environ["LU_LOGIN_PASSWORD"]
+app.config["MAX_CONTENT_LENGTH"] = 16 * 1024 * 1024  # 16 MB limitL
 
 # ---------------------------------------------------------------------------
 # Supabase client (Now used for BOTH Database and Storage!)
@@ -101,16 +105,22 @@ def delete_image_from_storage(storage_path):
     except Exception as e:
         app.logger.error(f"Error removing image from storage: {e}")
 
+@app.route("/sw.js")
+def serve_sw():
+    return app.send_static_file("js/sw.js")
+
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
     if request.method == "POST":
         password = request.form["password"]
-        if password == LOGIN_PASSWORD:
+        user = request.form.get("user", None)
+        if (user == "nathan" and password == NA_LOGIN_PASSWORD) or (user == "luisa" and password == LU_LOGIN_PASSWORD):
             session["logged_in"] = True
+            session["user"] = user
             return redirect(url_for("index"))
         else:
-            return render_template("login.html", error="Ungültiger Code")
+            return render_template("login.html", error="Ungültige Anmeldedaten. Bitte versuche es erneut.")
     return render_template("login.html")
 
 
@@ -181,6 +191,12 @@ def add_entry():
             "storage_path": storage_path,
             "img_placeholder_str": img_placeholder_str
         }).execute()
+        threading.Thread(
+            target=send_push_notifications,
+            args=("Memorybook", "Hey, es gibt eine neue Erinnerung! 💕"),
+            kwargs={"url_path": "/gallery"},
+            daemon=True,
+        ).start()
     except Exception as e:
         app.logger.error(f"Failed to insert entry: {e}")
 
@@ -252,6 +268,78 @@ def delete_entry(entry_id):
         return jsonify({"success": False, "error": "Database error"}), 500
 
     return jsonify({"success": True})
+
+@app.route("/api/subscribe", methods=["POST"])
+def subscribe():
+    if not is_logged_in():
+        return jsonify({"error": "Unauthorized"}), 401
+
+    subscription_data = request.get_json()
+    current_user = session.get("user")
+
+    if not subscription_data:
+        return jsonify({"error": "Invalid subscription data"}), 400
+
+    # In Supabase speichern (oder updaten, falls schon vorhanden)
+    try:
+        # Prüfen, ob für diesen User dieses Abo schon existiert
+        endpoint = subscription_data.get("endpoint")
+        res = supabase.table("push_subscriptions").select("*").eq("user", current_user).execute()
+        
+        # Einfachheitshalber speichern wir das neue Abo ab
+        supabase.table("push_subscriptions").insert({
+            "user": current_user,
+            "subscription_data": subscription_data
+        }).execute()
+        
+        return jsonify({"success": True})
+    except Exception as e:
+        app.logger.error(f"Failed to save subscription: {e}")
+        return jsonify({"error": "Database error"}), 500
+    
+def send_push_notifications(title, message, url_path="/gallery"):
+    try:
+        # Hole alle aktiven Abos aus der Datenbank
+        res = supabase.table("push_subscriptions").select("*").execute()
+        subscriptions = res.data or []
+    except Exception as e:
+        app.logger.error(f"Failed to fetch subscriptions for push: {e}")
+        return
+
+    vapid_private = os.environ["VAPID_PRIVATE_KEY"]
+
+    # Web Push erwartet bei "sub" eine mailto:-Adresse.
+    vapid_contact = os.environ.get("VAPID_MAILTO", "").strip().strip('"').strip("'")
+    if not vapid_contact:
+        app.logger.error("VAPID_MAILTO is missing; cannot send push notifications.")
+        return
+    if not vapid_contact.startswith("mailto:"):
+        vapid_contact = f"mailto:{vapid_contact}"
+
+    vapid_claims = {"sub": vapid_contact}
+
+    payload = json.dumps({
+        "title": title,
+        "body": message,
+        "url": url_path
+    })
+
+    for sub in subscriptions:
+        sub_data = sub.get("subscription_data")
+        try:
+            webpush(
+                subscription_info=sub_data,
+                data=payload,
+                vapid_private_key=vapid_private,
+                vapid_claims=vapid_claims
+            )
+        except WebPushException as ex:
+            app.logger.error(f"WebPush error: {ex}")
+            # Falls das Abo abgelaufen/ungültig ist (z.B. App deinstalliert), aus DB löschen
+            if ex.response and ex.response.status_code in [410, 404]:
+                supabase.table("push_subscriptions").delete().eq("id", sub.get("id")).execute()
+        except Exception as e:
+            app.logger.error(f"Unexpected push error: {e}")
 
 
 # ---------------------------------------------------------------------------

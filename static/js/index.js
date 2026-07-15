@@ -339,6 +339,57 @@ function setHeroTitle() {
     }
 }
 
+function urlBase64ToUint8Array(base64String) {
+    const padding = '='.repeat((4 - base64String.length % 4) % 4);
+    const base64 = (base64String + padding).replace(/\-/g, '+').replace(/_/g, '/');
+    const rawData = window.atob(base64);
+    const outputArray = new Uint8Array(rawData.length);
+    for (let i = 0; i < rawData.length; ++i) {
+        outputArray[i] = rawData.charCodeAt(i);
+    }
+    return outputArray;
+}
+
+const VAPID_PUBLIC_KEY = "BJ4spcyHbbYUVPNydj2awOhbFg5G1D3pPhHcvFjouMNoikZKakB0sjxn-UBRhibHueVcVhSsMoFga0YIddTkwbc";
+
+async function initPushNotifications() {
+    if ('serviceWorker' in navigator && 'PushManager' in window) {
+        try {
+            // 1. Service Worker registrieren
+            const register = await navigator.serviceWorker.register('/sw.js');
+            console.log('Service Worker registriert.');
+
+            // 2. Erlaubnis abfragen
+            const permission = await Notification.requestPermission();
+            if (permission !== 'granted') {
+                console.log('Benachrichtigungs-Erlaubnis verweigert.');
+                return;
+            }
+
+            // 3. Push-Abonnement erstellen
+            let subscription = await register.pushManager.getSubscription();
+            if (!subscription) {
+                subscription = await register.pushManager.subscribe({
+                    userVisibleOnly: true,
+                    applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
+                });
+            }
+
+            // 4. Abo-Daten an Flask-Backend senden
+            await fetch('/api/subscribe', {
+                method: 'POST',
+                body: JSON.stringify(subscription),
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            });
+            console.log('Push-Abo erfolgreich an Server übertragen.');
+        } catch (error) {
+            console.error('Fehler bei der Push-Registrierung:', error);
+        }
+    }
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     // Set default creation form date to today
     const dateInput = document.getElementById("date");
@@ -354,4 +405,5 @@ document.addEventListener('DOMContentLoaded', () => {
     setupManagementModals(); 
     loadEntries();
     setupTheme();
+    initPushNotifications();
 });
