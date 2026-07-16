@@ -242,14 +242,6 @@
             <div>
                 <div class="chat-kicker">Private Unterhaltung</div>
                 <h2 class="chat-title">Chat mit {{ 'Luisa' if chat_partner == 'luisa' else 'Nathan' }}</h2>
-                <p class="chat-subtitle">
-                    Nachrichten bleiben in eurer Erinnerung gespeichert. Erinnerungen aus dem Chat schicken direkt eine Push an den anderen Account.
-                </p>
-            </div>
-            <div class="chat-actions">
-                <button type="button" id="chat-open-remind-btn" class="btn-submit" style="background: #2f855a;">
-                    Erinnern <i class="fa-solid fa-bell"></i>
-                </button>
             </div>
         </header>
 
@@ -263,7 +255,6 @@
         <form id="chat-form" class="chat-composer">
             <textarea id="chat-input" class="form-control chat-input" placeholder="Schreib eine Nachricht..." required></textarea>
             <div class="chat-toolbar">
-                <div class="chat-footnote">Tipp: Enter sendet, Shift+Enter macht eine neue Zeile.</div>
                 <div class="chat-actions">
                     <button type="button" id="chat-remind-shortcut" class="btn-submit" style="background: #2f855a;">
                         Mit Erinnerung <i class="fa-solid fa-bell"></i>
