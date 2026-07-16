@@ -1,0 +1,302 @@
+{% extends "base.html" %}
+
+{% block title %}Chat{% endblock %}
+
+{% block header_title %}Chat{% endblock %}
+
+{% block header_nav %}
+<a href="/" style="color: var(--text-main); margin-right: var(--space-3); text-decoration: none; font-weight: 600;">
+    <i class="fa-solid fa-house"></i> Home
+</a>
+<a href="/gallery" style="color: var(--text-main); margin-right: var(--space-3); text-decoration: none; font-weight: 600;">
+    <i class="fa-solid fa-images"></i> Galerie
+</a>
+{% endblock %}
+
+{% block extra_head %}
+<style>
+    .chat-page {
+        max-width: 980px;
+        margin: var(--space-4) auto 0;
+        padding: 0 var(--space-4);
+    }
+
+    .chat-shell {
+        display: flex;
+        flex-direction: column;
+        height: calc(100vh - 140px);
+        min-height: 620px;
+        background: var(--bg-card);
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius-lg);
+        box-shadow: var(--shadow-card);
+        overflow: hidden;
+    }
+
+    .chat-header {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: var(--space-3);
+        padding: var(--space-4);
+        border-bottom: 1px solid var(--border-color);
+        background: linear-gradient(180deg, rgba(255,255,255,0.16), transparent);
+    }
+
+    .chat-kicker {
+        color: var(--text-muted);
+        font-size: 0.85rem;
+        margin-bottom: 4px;
+    }
+
+    .chat-title {
+        font-size: 1.4rem;
+        margin-bottom: 4px;
+    }
+
+    .chat-subtitle {
+        color: var(--text-muted);
+        font-size: 0.95rem;
+        line-height: 1.5;
+    }
+
+    .chat-messages {
+        flex: 1;
+        overflow-y: auto;
+        padding: var(--space-4);
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-3);
+        background:
+            radial-gradient(circle at top right, rgba(255, 77, 109, 0.08), transparent 28%),
+            radial-gradient(circle at bottom left, rgba(255, 214, 224, 0.5), transparent 22%),
+            var(--bg-main);
+    }
+
+    .chat-empty {
+        margin: auto;
+        text-align: center;
+        color: var(--text-muted);
+        max-width: 360px;
+        line-height: 1.6;
+    }
+
+    .chat-bubble {
+        max-width: min(78%, 640px);
+        padding: 0.9rem 1rem;
+        border-radius: 18px 18px 18px 6px;
+        background: var(--bg-card);
+        border: 1px solid var(--border-color);
+        box-shadow: 0 6px 18px rgba(0, 0, 0, 0.04);
+        align-self: flex-start;
+    }
+
+    .chat-bubble.is-self {
+        align-self: flex-end;
+        border-radius: 18px 18px 6px 18px;
+        background: rgba(255, 77, 109, 0.08);
+        border-color: rgba(255, 77, 109, 0.18);
+    }
+
+    .chat-bubble.is-reminder {
+        background: rgba(47, 133, 90, 0.1);
+        border-color: rgba(47, 133, 90, 0.2);
+    }
+
+    .chat-meta {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: var(--space-2);
+        margin-bottom: 0.35rem;
+        font-size: 0.78rem;
+        color: var(--text-muted);
+    }
+
+    .chat-meta-right {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+    }
+
+    .chat-sender {
+        font-weight: 700;
+        color: var(--text-main);
+    }
+
+    .chat-status {
+        display: inline-flex;
+        align-items: center;
+        padding: 0.15rem 0.45rem;
+        border-radius: 999px;
+        background: rgba(47, 133, 90, 0.12);
+        color: #2f855a;
+        font-size: 0.72rem;
+        font-weight: 700;
+        letter-spacing: 0.02em;
+    }
+
+    .chat-text {
+        white-space: pre-wrap;
+        line-height: 1.55;
+        color: var(--text-main);
+    }
+
+    .chat-link {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.45rem;
+        margin-top: 0.7rem;
+        text-decoration: none;
+        color: var(--accent);
+        font-weight: 700;
+    }
+
+    .chat-composer {
+        padding: var(--space-4);
+        border-top: 1px solid var(--border-color);
+        background: var(--bg-card);
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-3);
+    }
+
+    .chat-toolbar {
+        display: flex;
+        gap: var(--space-2);
+        flex-wrap: wrap;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .chat-actions {
+        display: flex;
+        gap: var(--space-2);
+        flex-wrap: wrap;
+        margin-left: auto;
+    }
+
+    .chat-actions .btn-submit {
+        width: auto;
+        padding: 0.75rem 1rem;
+    }
+
+    .chat-input {
+        min-height: 72px;
+        resize: vertical;
+    }
+
+    .chat-footnote {
+        color: var(--text-muted);
+        font-size: 0.82rem;
+    }
+
+    #open-modal-btn,
+    #entry-modal,
+    #detail-modal,
+    #edit-modal,
+    #context-menu,
+    #remind-modal,
+    #push-modal {
+        display: none !important;
+    }
+
+    @media (max-width: 700px) {
+        .chat-page {
+            padding: 0 var(--space-3);
+        }
+
+        .chat-shell {
+            height: calc(100vh - 116px);
+            min-height: 0;
+        }
+
+        .chat-header,
+        .chat-messages,
+        .chat-composer {
+            padding: var(--space-3);
+        }
+
+        .chat-bubble {
+            max-width: 92%;
+        }
+
+        .chat-actions {
+            width: 100%;
+        }
+
+        .chat-actions .btn-submit {
+            flex: 1 1 140px;
+            width: 100%;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<main class="chat-page">
+    <section class="chat-shell">
+        <header class="chat-header">
+            <div>
+                <div class="chat-kicker">Private Unterhaltung</div>
+                <h2 class="chat-title">Chat mit {{ 'Luisa' if chat_partner == 'luisa' else 'Nathan' }}</h2>
+                <p class="chat-subtitle">
+                    Nachrichten bleiben in eurer Erinnerung gespeichert. Erinnerungen aus dem Chat schicken direkt eine Push an den anderen Account.
+                </p>
+            </div>
+            <div class="chat-actions">
+                <button type="button" id="chat-open-remind-btn" class="btn-submit" style="background: #2f855a;">
+                    Erinnern <i class="fa-solid fa-bell"></i>
+                </button>
+            </div>
+        </header>
+
+        <div id="chat-messages" class="chat-messages">
+            <div class="chat-empty">
+                <strong>Noch keine Nachricht</strong>
+                <div>Schick den ersten Gruß oder erinnere direkt an einen gemeinsamen Moment.</div>
+            </div>
+        </div>
+
+        <form id="chat-form" class="chat-composer">
+            <textarea id="chat-input" class="form-control chat-input" placeholder="Schreib eine Nachricht..." required></textarea>
+            <div class="chat-toolbar">
+                <div class="chat-footnote">Tipp: Enter sendet, Shift+Enter macht eine neue Zeile.</div>
+                <div class="chat-actions">
+                    <button type="button" id="chat-remind-shortcut" class="btn-submit" style="background: #2f855a;">
+                        Mit Erinnerung <i class="fa-solid fa-bell"></i>
+                    </button>
+                    <button type="submit" class="btn-submit">
+                        Senden <i class="fa-solid fa-paper-plane"></i>
+                    </button>
+                </div>
+            </div>
+        </form>
+    </section>
+</main>
+
+<div class="modal-overlay" id="chat-remind-modal">
+    <div class="modal-content modal-remind">
+        <div class="modal-header">
+            <h3>Erinnerung aus dem Chat</h3>
+            <button class="close-modal-btn" id="close-chat-remind-btn">&times;</button>
+        </div>
+        <p style="margin-bottom: var(--space-3); color: var(--text-muted);">
+            Wähle einen Eintrag aus und füge optional eine Nachricht hinzu. Die Push führt direkt zum Eintrag.
+        </p>
+        <div class="form-group">
+            <label for="chat-remind-entry">Eintrag</label>
+            <select id="chat-remind-entry" class="form-control" required></select>
+        </div>
+        <div class="form-group">
+            <label for="chat-remind-message">Nachricht</label>
+            <textarea id="chat-remind-message" class="form-control" rows="4" placeholder="Zum Beispiel: Schau dir diesen Moment nochmal an..."></textarea>
+        </div>
+        <button id="chat-send-remind-btn" class="btn-submit" style="width: 100%;">
+            Erinnern <i class="fa-solid fa-bell"></i>
+        </button>
+    </div>
+</div>
+{% endblock %}

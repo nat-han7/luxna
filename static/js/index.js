@@ -1,4 +1,4 @@
-// Anniversary Configuration: April 27, 2026 (Month is 0-indexed, so 3 is April)
+﻿// Anniversary Configuration: April 27, 2026 (Month is 0-indexed, so 3 is April)
 const anniversaryDate = new Date(2026, 3, 27, 16, 0, 0); 
 
 function formatDateForDisplay(dateStr) {
@@ -83,6 +83,8 @@ function setupModal() {
 
 let currentSelectedEntry = null;
 let globalEntriesData = [];
+let chatRefreshInterval = null;
+let chatReminderEntriesLoaded = false;
 
 function getEntryIdFromUrl() {
     const value = new URLSearchParams(window.location.search).get('id');
@@ -127,6 +129,223 @@ function openReminderModal(entry) {
     document.getElementById('remind-modal').classList.add('is-active');
 }
 
+function escapeHtml(value) {
+    return String(value ?? '')
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#39;');
+}
+
+function formatChatTimestamp(value) {
+    if (!value) return '';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return '';
+    return new Intl.DateTimeFormat('de-DE', {
+        day: '2-digit',
+        month: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit'
+    }).format(date);
+}
+
+function getChatLabel(username) {
+    if (!username) return 'Unbekannt';
+    if (username === window.currentUser) return 'Du';
+    if (username === 'nathan') return 'Nathan';
+    if (username === 'luisa') return 'Luisa';
+    return username;
+}
+
+async function loadChatReminderEntries() {
+    const select = document.getElementById('chat-remind-entry');
+    if (!select || chatReminderEntriesLoaded) return;
+
+    try {
+        const response = await fetch('/api/entries?limit=20');
+        const data = await response.json();
+        const entries = data.entries || [];
+
+        select.innerHTML = '';
+        if (!entries.length) {
+            select.innerHTML = '<option value="" disabled selected>Keine Einträge vorhanden</option>';
+            select.disabled = true;
+            return;
+        }
+
+        select.disabled = false;
+        select.insertAdjacentHTML('beforeend', '<option value="" disabled selected>Eintrag auswählen</option>');
+        entries.forEach(entry => {
+            const option = document.createElement('option');
+            option.value = entry.id;
+            option.textContent = `${formatDateForDisplay(entry.date)} - ${entry.title}`;
+            select.appendChild(option);
+        });
+        chatReminderEntriesLoaded = true;
+    } catch (error) {
+        console.error('Fehler beim Laden der Einträge für Erinnerungen:', error);
+    }
+}
+
+function renderChatMessages(messages) {
+    const container = document.getElementById('chat-messages');
+    if (!container) return;
+
+    if (!messages || messages.length === 0) {
+        container.innerHTML = `
+            <div class="chat-empty">
+                <strong>Noch keine Nachricht</strong>
+                <div>Schick den ersten Gruß oder erinnere direkt an einen gemeinsamen Moment.</div>
+            </div>
+        `;
+        return;
+    }
+
+    container.innerHTML = messages.map(message => {
+        const isReminder = message.kind === 'reminder';
+        const isSelf = message.sender === window.currentUser;
+        const bubbleClasses = ['chat-bubble'];
+        if (isSelf) bubbleClasses.push('is-self');
+        if (isReminder) bubbleClasses.push('is-reminder');
+
+        const body = isReminder
+            ? message.entry_title
+                ? `${message.message || 'Eine Erinnerung'}`
+                : (message.message || 'Eine Erinnerung')
+            : (message.message || '');
+
+        const reminderLink = isReminder && message.entry_id
+            ? `<a class="chat-link" href="/gallery?id=${message.entry_id}"><i class="fa-solid fa-arrow-up-right-from-square"></i> Eintrag öffnen</a>`
+            : '';
+
+        const deliveryStatus = isSelf && message.delivery_status
+            ? `<span class="chat-status">${escapeHtml(message.delivery_status)}</span>`
+            : '';
+
+        return `
+            <article class="${bubbleClasses.join(' ')}">
+                <div class="chat-meta">
+                    <span class="chat-sender">${escapeHtml(getChatLabel(message.sender))}${isReminder ? ' · Erinnerung' : ''}</span>
+                    <span class="chat-meta-right">
+                        <span>${escapeHtml(formatChatTimestamp(message.created_at))}</span>
+                        ${deliveryStatus}
+                    </span>
+                </div>
+                <div class="chat-text">${escapeHtml(body)}</div>
+                ${reminderLink}
+            </article>
+        `;
+    }).join('');
+
+    container.scrollTop = container.scrollHeight;
+}
+async function loadChatMessages() {
+    const container = document.getElementById('chat-messages');
+    if (!container) return;
+
+    try {
+        const response = await fetch('/api/chat/messages');
+        const data = await response.json();
+        renderChatMessages(data.messages || []);
+    } catch (error) {
+        console.error('Fehler beim Laden des Chats:', error);
+        container.innerHTML = `<div class="chat-empty">Der Chat konnte gerade nicht geladen werden. Bitte lade die Seite neu.</div>`;
+    }
+}
+
+async function sendChatMessage() {
+    const input = document.getElementById('chat-input');
+    if (!input) return;
+
+    const message = input.value.trim();
+    if (!message) return;
+
+    try {
+        const response = await fetch('/api/chat/send', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ message })
+        });
+        const data = await response.json();
+        if (!response.ok || !data.success) {
+            throw new Error(data.error || 'Chat message failed');
+        }
+        input.value = '';
+        await loadChatMessages();
+    } catch (error) {
+        console.error('Fehler beim Senden der Nachricht:', error);
+    }
+}
+
+async function openChatReminderModal() {
+    const modal = document.getElementById('chat-remind-modal');
+    if (!modal) return;
+    await loadChatReminderEntries();
+    modal.classList.add('is-active');
+}
+
+function closeChatReminderModal() {
+    document.getElementById('chat-remind-modal')?.classList.remove('is-active');
+}
+
+async function sendChatReminder() {
+    const entrySelect = document.getElementById('chat-remind-entry');
+    const messageInput = document.getElementById('chat-remind-message');
+    if (!entrySelect || !entrySelect.value) return;
+
+    try {
+        const response = await fetch(`/api/remind/${entrySelect.value}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ message: messageInput ? messageInput.value.trim() : '' })
+        });
+        const data = await response.json();
+        if (!response.ok || !data.success) {
+            throw new Error(data.error || 'Reminder failed');
+        }
+        if (messageInput) messageInput.value = '';
+        closeChatReminderModal();
+        await loadChatMessages();
+    } catch (error) {
+        console.error('Fehler beim Senden der Erinnerung:', error);
+    }
+}
+
+function initChatPage() {
+    const messagesContainer = document.getElementById('chat-messages');
+    if (!messagesContainer) return;
+
+    document.getElementById('chat-form')?.addEventListener('submit', (e) => {
+        e.preventDefault();
+        sendChatMessage();
+    });
+
+    document.getElementById('chat-input')?.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            sendChatMessage();
+        }
+    });
+
+    document.getElementById('chat-open-remind-btn')?.addEventListener('click', openChatReminderModal);
+    document.getElementById('chat-remind-shortcut')?.addEventListener('click', openChatReminderModal);
+    document.getElementById('close-chat-remind-btn')?.addEventListener('click', closeChatReminderModal);
+    document.getElementById('chat-send-remind-btn')?.addEventListener('click', sendChatReminder);
+    document.getElementById('chat-remind-modal')?.addEventListener('click', (e) => {
+        if (e.target.id === 'chat-remind-modal') {
+            closeChatReminderModal();
+        }
+    });
+
+    loadChatMessages();
+    chatRefreshInterval = setInterval(loadChatMessages, 5000);
+}
+
 function setupLazyLoading() {
     const images = document.querySelectorAll('.card-image-wrapper img[data-src]');
 
@@ -168,7 +387,7 @@ function loadEntries() {
             globalEntriesData = data.entries;
 
             if (data.entries.length === 0) {
-                container.innerHTML = `<p style="text-align:center; color:var(--text-muted); width:100%; padding: var(--space-4);">Hier ist es noch ganz leer... Lass uns schnell die erste gemeinsame Erinnerung reinschreiben! ✨</p>`;
+                container.innerHTML = `<p style="text-align:center; color:var(--text-muted); width:100%; padding: var(--space-4);">Hier ist es noch ganz leer... Lass uns schnell die erste gemeinsame Erinnerung reinschreiben! âœ¨</p>`;
                 return;
             }
 
@@ -328,7 +547,7 @@ function openEditModal(entry) {
 }
 
 function deleteEntryHandler(entryId) {
-    if (confirm("Möchtest du diese wunderschöne Erinnerung wirklich unwiderruflich löschen? 😢")) {
+    if (confirm("Möchtest du diese wunderschöne Erinnerung wirklich unwiderruflich löschen?")) {
         fetch(`/delete_entry/${entryId}`, { method: 'DELETE' })
             .then(res => res.json())
             .then(data => {
@@ -501,7 +720,7 @@ async function initPushNotifications() {
         }
 
         if (Notification.permission === 'default') {
-            openPushModal('Damit iOS Push-Benachrichtigungen zulässt, musst du sie per Klick aktivieren.');
+            openPushModal('Damit Push-Benachrichtigungen aktiviert werden, musst du sie per Klick einschalten.');
             return;
         }
 
@@ -554,6 +773,7 @@ document.addEventListener('DOMContentLoaded', () => {
     loadEntries();
     setupTheme();
     initPushNotifications();
+    initChatPage();
 
     document.getElementById('enable-push-btn')?.addEventListener('click', enablePushNotifications);
     document.getElementById('close-push-modal-btn')?.addEventListener('click', closePushModal);
@@ -569,3 +789,10 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 });
+
+window.addEventListener('beforeunload', () => {
+    if (chatRefreshInterval) {
+        clearInterval(chatRefreshInterval);
+    }
+});
+

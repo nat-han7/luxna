@@ -4,6 +4,7 @@ import base64
 import uuid
 from io import BytesIO
 from datetime import datetime
+from datetime import timedelta
 from PIL import Image
 import pi_heif
 from supabase import create_client, Client
@@ -19,6 +20,9 @@ load_dotenv()
 pi_heif.register_heif_opener()
 
 app = Flask(__name__)
+app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(days=90)
+app.config["SESSION_COOKIE_HTTPONLY"] = True
+app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
 
 # ---------------------------------------------------------------------------
 # Secrets & config
@@ -46,6 +50,13 @@ def allowed_file(filename):
 
 def is_logged_in():
     return session.get("logged_in", False)
+
+
+@app.before_request
+def keep_session_alive():
+    if session.get("logged_in"):
+        session.permanent = True
+        session.modified = True
 
 
 def process_and_upload_image(file):
@@ -118,10 +129,17 @@ def login():
         if (user == "nathan" and password == NA_LOGIN_PASSWORD) or (user == "luisa" and password == LU_LOGIN_PASSWORD):
             session["logged_in"] = True
             session["user"] = user
+            session.permanent = True
             return redirect(url_for("index"))
         else:
-            return render_template("login.html", error="Ungültige Anmeldedaten. Bitte versuche es erneut.")
+                                    return render_template("login.html", error="Ungültige Anmeldedaten. Bitte versuche es erneut.")
     return render_template("login.html")
+
+
+@app.route("/logout")
+def logout():
+    session.clear()
+    return redirect(url_for("login"))
 
 
 @app.route("/api/entries")
@@ -160,12 +178,136 @@ def gallery():
     return render_template("gallery.html")
 
 
+@app.route("/chat")
+def chat():
+    if not is_logged_in():
+        return redirect(url_for("login"))
+
+    return render_template(
+        "chat.html",
+        chat_partner=get_other_user(session.get("user")),
+    )
+
+
 def get_other_user(username):
     if username == "nathan":
         return "luisa"
     if username == "luisa":
         return "nathan"
     return None
+
+
+def normalize_chat_message_row(row):
+    row = dict(row)
+    row["is_self"] = row.get("sender") == session.get("user")
+    row["is_read"] = bool(row.get("read_at"))
+    if row["is_self"]:
+        row["delivery_status"] = "Gelesen" if row["is_read"] else "Gesendet"
+    else:
+        row["delivery_status"] = ""
+    return row
+
+
+def insert_chat_message(sender, recipient, message, kind="message", entry_id=None, entry_title=None):
+    payload = {
+        "sender": sender,
+        "recipient": recipient,
+        "message": message,
+        "kind": kind,
+    }
+    if entry_id is not None:
+        payload["entry_id"] = entry_id
+    if entry_title:
+        payload["entry_title"] = entry_title
+
+    supabase.table("chat_messages").insert(payload).execute()
+
+
+def mark_chat_messages_read(sender, recipient):
+    try:
+        response = (
+            supabase.table("chat_messages")
+            .select("id, read_at")
+            .eq("sender", sender)
+            .eq("recipient", recipient)
+            .execute()
+        )
+        unread_ids = [row["id"] for row in (response.data or []) if not row.get("read_at")]
+        if not unread_ids:
+            return
+
+        supabase.table("chat_messages").update({
+            "read_at": datetime.utcnow().isoformat() + "Z",
+        }).in_("id", unread_ids).execute()
+    except Exception as e:
+        app.logger.error(f"Failed to mark chat messages read: {e}")
+
+
+@app.route("/api/chat/messages")
+def get_chat_messages():
+    if not is_logged_in():
+        return jsonify({"error": "Unauthorized"}), 401
+
+    current_user = session.get("user")
+    partner = get_other_user(current_user)
+    if not partner:
+        return jsonify({"messages": []})
+
+    try:
+        response = (
+            supabase.table("chat_messages")
+            .select("*")
+            .order("created_at", desc=False)
+            .limit(200)
+            .execute()
+        )
+        rows = [
+            normalize_chat_message_row(row)
+            for row in (response.data or [])
+            if {row.get("sender"), row.get("recipient")} <= {current_user, partner}
+        ]
+
+        if rows:
+            mark_chat_messages_read(partner, current_user)
+    except Exception as e:
+        app.logger.error(f"Failed to fetch chat messages: {e}")
+        rows = []
+
+    return jsonify({"messages": rows})
+
+
+@app.route("/api/chat/send", methods=["POST"])
+def send_chat_message():
+    if not is_logged_in():
+        return jsonify({"error": "Unauthorized"}), 401
+
+    current_user = session.get("user")
+    partner = get_other_user(current_user)
+    if not partner:
+        return jsonify({"error": "Unknown user"}), 400
+
+    payload = request.get_json(silent=True) or {}
+    message = (payload.get("message") or "").strip()
+
+    if not message:
+        return jsonify({"error": "Message is required"}), 400
+
+    try:
+        insert_chat_message(current_user, partner, message, kind="message")
+        threading.Thread(
+            target=send_push_notifications_to_user,
+            args=(
+                partner,
+                f"Neue Nachricht von {current_user.capitalize()}",
+                message,
+                "/chat",
+            ),
+            daemon=True,
+        ).start()
+        return jsonify({"success": True})
+    except Exception as e:
+        app.logger.error(f"Failed to send chat message: {e}")
+        return jsonify({"error": "Database error"}), 500
 
 
 @app.route("/add_entry", methods=["POST"])
@@ -441,6 +583,18 @@ def remind_entry(entry_id):
         args=(target_user, title, body, entry_url),
         daemon=True,
     ).start()
+
+    try:
+        insert_chat_message(
+            current_user,
+            target_user,
+            body,
+            kind="reminder",
+            entry_id=entry_id,
+            entry_title=entry.get("title"),
+        )
+    except Exception as e:
+        app.logger.error(f"Failed to store reminder in chat: {e}")
 
     return jsonify({"success": True})
 

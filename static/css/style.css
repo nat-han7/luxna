@@ -330,6 +330,15 @@ body {
     overflow-y: auto;
 }
 
+.modal-content.modal-detail {
+    max-width: 760px;
+}
+
+.modal-content.modal-remind,
+.modal-content.modal-push {
+    max-width: 520px;
+}
+
 @media (min-width: 601px) {
     .modal-overlay {
         align-items: center; /* Mittig auf dem Desktop */
@@ -342,6 +351,20 @@ body {
 
 .modal-overlay.is-active .modal-content {
     transform: translateY(0) scale(1);
+}
+
+.modal-detail #detail-image-container {
+    margin-bottom: var(--space-3);
+}
+
+.modal-detail #detail-image-container img {
+    border-radius: var(--radius-md);
+}
+
+.detail-actions {
+    display: flex;
+    gap: var(--space-2);
+    flex-wrap: wrap;
 }
 
 .modal-header {
@@ -357,6 +380,93 @@ body {
     font-size: 1.5rem;
     color: var(--text-muted);
     cursor: pointer;
+}
+
+@media (max-width: 600px) {
+    .modal-overlay {
+        align-items: flex-end;
+    }
+
+    .modal-content {
+        max-width: 100%;
+        width: 100%;
+        max-height: 92vh;
+        border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+        padding: var(--space-3);
+    }
+
+    .modal-content.modal-detail,
+    .modal-content.modal-remind,
+    .modal-content.modal-push {
+        max-width: 100%;
+    }
+
+    .modal-header {
+        margin-bottom: var(--space-3);
+        gap: var(--space-2);
+    }
+
+    .modal-header h3 {
+        font-size: 1.1rem;
+        line-height: 1.25;
+    }
+
+    .detail-actions {
+        flex-direction: column;
+        gap: var(--space-2);
+    }
+
+    .detail-actions .btn-submit {
+        width: 100% !important;
+        padding: 0.85rem 1rem !important;
+    }
+
+    .modal-detail #detail-text {
+        font-size: 0.98rem;
+        line-height: 1.6;
+        margin-bottom: var(--space-3);
+    }
+
+    .modal-detail #detail-date {
+        margin-bottom: var(--space-2);
+        font-size: 0.85rem;
+    }
+
+    .modal-detail #detail-image-container {
+        margin-bottom: var(--space-2);
+    }
+
+    .modal-detail #detail-image-container img {
+        max-height: 260px;
+    }
+
+    .modal-content .form-group {
+        margin-bottom: var(--space-2);
+    }
+
+    .modal-content .form-control,
+    .modal-content textarea.form-control {
+        font-size: 16px;
+    }
+}
+
+@media (max-width: 420px) {
+    .modal-content {
+        padding: var(--space-3) var(--space-3) calc(var(--space-4) + env(safe-area-inset-bottom));
+    }
+
+    .close-modal-btn {
+        font-size: 1.8rem;
+        line-height: 1;
+    }
+
+    .modal-detail #detail-image-container img {
+        max-height: 220px;
+    }
+
+    .btn-submit {
+        min-height: 48px;
+    }
 }
 
 /* =========================================================

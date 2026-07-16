@@ -29,6 +29,9 @@
                 <a href="/gallery" style="color: var(--text-main); margin-right: var(--space-3); text-decoration: none; font-weight: 600;">
                     <i class="fa-solid fa-images"></i> Galerie
                 </a>
+                <a href="/chat" style="color: var(--text-main); margin-right: var(--space-3); text-decoration: none; font-weight: 600;">
+                    <i class="fa-solid fa-comments"></i> Chat
+                </a>
                 {% endblock %}
                 <button id="theme-toggle-btn" style="background:none; border:none; font-size:1.2rem; cursor:pointer; color:var(--text-main);">
                     <i class="fa-solid fa-moon"></i>
@@ -70,14 +73,14 @@
                     <label for="date">Wann war das?</label>
                     <input type="date" id="date" name="date" class="form-control" style="width:90%;" required>
                 </div>
-                <button type="submit" class="btn-submit">Erinnerung sichern <i class="fa-solid fa-heart"></i></button>
+                <button type="submit" class="btn-submit">Anderungen speichern <i class="fa-solid fa-heart"></i></button>
             </form>
         </div>
     </div>
     
     <!-- Detail View Modal -->
     <div class="modal-overlay" id="detail-modal">
-        <div class="modal-content" style="max-width: 700px;">
+        <div class="modal-content modal-detail">
             <div class="modal-header">
                 <h3 id="detail-title">Erinnerung</h3>
                 <button class="close-modal-btn" id="close-detail-btn">&times;</button>
@@ -86,7 +89,7 @@
             <p id="detail-date" style="color: var(--text-muted); margin: var(--space-2) 0; font-size: 0.9rem;"></p>
             <p id="detail-text" style="white-space: pre-line; margin-bottom: var(--space-4);"></p>
             
-            <div style="display: flex; gap: var(--space-2);">
+            <div class="detail-actions">
                 <button id="detail-remind-btn" class="btn-submit" style="background: #2f855a; width: auto; padding: 0.75rem 1.5rem;">Mit Luisa/Nathan erinnern <i class="fa-solid fa-bell"></i></button>
                 <button id="detail-edit-btn" class="btn-submit" style="background: var(--soft-grey); width: auto; padding: 0.75rem 1.5rem;">Bearbeiten <i class="fa-solid fa-pen"></i></button>
                 <button id="detail-delete-btn" class="btn-submit" style="background: var(--heart-red); width: auto; padding: 0.75rem 1.5rem;">Löschen <i class="fa-solid fa-trash"></i></button>
@@ -103,7 +106,7 @@
             </div>
             <form id="edit-form" method="POST" enctype="multipart/form-data">
                 <div class="form-group">
-                    <label for="edit-title">Was haben wir Schönes gemacht?</label>
+                    <label for="title">Was haben wir Schönes gemacht?</label>
                     <input type="text" id="edit-title" name="title" class="form-control" required>
                 </div>
                 <div class="form-group">
@@ -118,7 +121,7 @@
                     <label for="edit-date">Wann war das?</label>
                     <input type="date" id="edit-date" name="date" class="form-control" style="width:90%;" required>
                 </div>
-                <button type="submit" class="btn-submit">Änderungen speichern <i class="fa-solid fa-heart"></i></button>
+                <button type="submit" class="btn-submit">Anderungen speichern <i class="fa-solid fa-heart"></i></button>
             </form>
         </div>
     </div>
@@ -131,7 +134,7 @@
 
     <!-- Reminder Modal -->
     <div class="modal-overlay" id="remind-modal">
-        <div class="modal-content" style="max-width: 520px;">
+        <div class="modal-content modal-remind">
             <div class="modal-header">
                 <h3 id="remind-modal-title">Mit Luisa/Nathan erinnern</h3>
                 <button class="close-modal-btn" id="close-remind-modal-btn">&times;</button>
@@ -151,13 +154,13 @@
 
     <!-- Push Notification Prompt -->
     <div class="modal-overlay" id="push-modal">
-        <div class="modal-content" style="max-width: 520px;">
+        <div class="modal-content modal-push">
             <div class="modal-header">
                 <h3>Benachrichtigungen aktivieren</h3>
                 <button class="close-modal-btn" id="close-push-modal-btn">&times;</button>
             </div>
             <p id="push-modal-text" style="margin-bottom: var(--space-4); color: var(--text-main);">
-                Damit iOS Benachrichtigungen zulässt, musst du sie per Klick aktivieren. Danach bleiben sie für neue Erinnerungen eingeschaltet.
+                Damit dein Gerät Benachrichtigungen zulässt, musst du sie per Klick aktivieren. Danach bleiben sie für neue Erinnerungen eingeschaltet.
             </p>
             <button id="enable-push-btn" class="btn-submit" style="width: 100%;">
                 Benachrichtigungen aktivieren <i class="fa-solid fa-bell"></i>
