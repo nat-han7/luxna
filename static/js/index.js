@@ -1,4 +1,4 @@
-﻿// Anniversary Configuration: April 27, 2026 (Month is 0-indexed, so 3 is April)
+// Anniversary Configuration: April 27, 2026 (Month is 0-indexed, so 3 is April)
 const anniversaryDate = new Date(2026, 3, 27, 16, 0, 0); 
 
 function formatDateForDisplay(dateStr) {
@@ -623,9 +623,11 @@ function urlBase64ToUint8Array(base64String) {
     return outputArray;
 }
 
-const VAPID_PUBLIC_KEY = "BJ4spcyHbbYUVPNydj2awOhbFg5G1D3pPhHcvFjouMNoikZKakB0sjxn-UBRhibHueVcVhSsMoFga0YIddTkwbc";
+const VAPID_PUBLIC_KEY = window.vapidPublicKey || "";
+const PUSH_VAPID_KEY_STORAGE = 'push_vapid_public_key';
 
 let pushServiceWorkerRegistration = null;
+let currentPushStatus = 'inactive';
 
 function canUsePushNotifications() {
     return 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
@@ -644,6 +646,11 @@ function openPushModal(message) {
 
 function closePushModal() {
     document.getElementById('push-modal')?.classList.remove('is-active');
+    localStorage.setItem('push_modal_dismissed', 'true');
+}
+
+function closePushInfoModal() {
+    document.getElementById('push-info-modal')?.classList.remove('is-active');
 }
 
 async function registerPushServiceWorker() {
@@ -667,7 +674,159 @@ async function syncPushSubscription(subscription) {
             'Content-Type': 'application/json'
         }
     });
+    try {
+        localStorage.setItem(PUSH_VAPID_KEY_STORAGE, VAPID_PUBLIC_KEY);
+    } catch (error) {
+        console.warn('Konnte die Push-Key-Version nicht speichern:', error);
+    }
     console.log('Push-Abo erfolgreich an Server übertragen.');
+}
+
+async function getCurrentPushSubscription(register) {
+    let subscription = await register.pushManager.getSubscription();
+
+    if (subscription) {
+        try {
+            const storedKey = localStorage.getItem(PUSH_VAPID_KEY_STORAGE);
+            if (!storedKey || storedKey !== VAPID_PUBLIC_KEY) {
+                await subscription.unsubscribe();
+                subscription = null;
+            }
+        } catch (error) {
+            console.warn('Konnte die gespeicherte Push-Key-Version nicht lesen:', error);
+        }
+    }
+
+    if (!subscription) {
+        subscription = await register.pushManager.subscribe({
+            userVisibleOnly: true,
+            applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
+        });
+    }
+
+    return subscription;
+}
+
+function updatePushStatusUI(status) {
+    currentPushStatus = status;
+    const btn = document.getElementById('push-status-btn');
+    const dot = btn ? btn.querySelector('.push-dot') : null;
+    const icon = btn ? btn.querySelector('i') : null;
+
+    if (!btn) return;
+
+    if (status === 'active') {
+        if (icon) {
+            icon.className = 'fa-solid fa-bell';
+            icon.style.color = 'var(--accent)';
+        }
+        if (dot) dot.style.display = 'none';
+        btn.title = 'Push-Benachrichtigungen aktiv';
+    } else if (status === 'denied') {
+        if (icon) {
+            icon.className = 'fa-solid fa-bell-slash';
+            icon.style.color = 'var(--text-muted)';
+        }
+        if (dot) dot.style.display = 'none';
+        btn.title = 'Push-Benachrichtigungen blockiert';
+    } else if (status === 'ios-not-pwa') {
+        if (icon) {
+            icon.className = 'fa-regular fa-bell';
+            icon.style.color = 'var(--text-muted)';
+        }
+        if (dot) {
+            dot.style.display = 'block';
+            dot.style.backgroundColor = '#e53e3e';
+        }
+        btn.title = 'Push aktivieren (iOS Home-Bildschirm benötigt)';
+    } else if (status === 'unsupported' || status === 'unconfigured') {
+        if (icon) {
+            icon.className = 'fa-solid fa-bell-slash';
+            icon.style.color = 'var(--text-muted)';
+        }
+        if (dot) dot.style.display = 'none';
+        btn.title = 'Push nicht unterstützt';
+    } else {
+        // Inactive / default state
+        if (icon) {
+            icon.className = 'fa-regular fa-bell';
+            icon.style.color = 'var(--text-main)';
+        }
+        if (dot) {
+            dot.style.display = 'block';
+            dot.style.backgroundColor = 'var(--accent)';
+        }
+        btn.title = 'Push-Benachrichtigungen einrichten';
+    }
+}
+
+function handlePushStatusClick() {
+    if (currentPushStatus === 'active') {
+        document.getElementById('push-info-modal')?.classList.add('is-active');
+    } else if (currentPushStatus === 'denied') {
+        openPushModal('Du hast Benachrichtigungen für diese Seite blockiert. Bitte setze die Berechtigungen in deinen Browser-Einstellungen zurück (Klick auf das Schloss-Symbol neben der URL) und klicke hier erneut, um sie zu aktivieren. 💕');
+    } else if (currentPushStatus === 'ios-not-pwa') {
+        openPushModal('Auf dem iPhone/iPad unterstützt Safari Push-Benachrichtigungen nur, wenn die Seite als App auf dem Home-Bildschirm installiert ist.\n\nFüge uns hinzu: Tippe auf Teilen (Viereck mit Pfeil) -> Zum Home-Bildschirm und öffne das Memorybook von dort. 💕');
+    } else if (currentPushStatus === 'unsupported' || currentPushStatus === 'unconfigured') {
+        openPushModal('Dein aktueller Browser unterstützt leider keine Push-Benachrichtigungen oder die Serverkonfiguration fehlt. Bitte verwende Safari (iOS), Chrome oder Firefox. 🥺');
+    } else {
+        openPushModal('Damit du Benachrichtigungen für neue Erinnerungen und Nachrichten erhältst, aktiviere sie bitte per Klick.');
+    }
+}
+
+async function sendTestPushNotification() {
+    const btn = document.getElementById('send-test-push-btn');
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = 'Sendet... <i class="fa-solid fa-spinner fa-spin"></i>';
+    }
+    try {
+        const response = await fetch('/api/push/test', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+        const data = await response.json();
+        if (response.ok && data.success) {
+            alert('Test-Benachrichtigung wurde gesendet! Sie sollte in wenigen Sekunden ankommen. 🔔');
+        } else {
+            throw new Error(data.error || 'Request failed');
+        }
+    } catch (err) {
+        console.error('Test push error:', err);
+        alert('Test-Benachrichtigung fehlgeschlagen. Bitte stelle sicher, dass dein Gerät Internetverbindung hat.');
+    } finally {
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = 'Test-Benachrichtigung senden <i class="fa-solid fa-paper-plane"></i>';
+        }
+        document.getElementById('push-info-modal')?.classList.remove('is-active');
+    }
+}
+
+async function forceReRegisterPush() {
+    const consent = confirm('Möchtest du das aktuelle Push-Abonnement zurücksetzen und neu registrieren?');
+    if (!consent) return;
+
+    document.getElementById('push-info-modal')?.classList.remove('is-active');
+    updatePushStatusUI('inactive');
+
+    try {
+        if ('serviceWorker' in navigator) {
+            const register = await navigator.serviceWorker.ready;
+            const subscription = await register.pushManager.getSubscription();
+            if (subscription) {
+                await subscription.unsubscribe();
+                console.log('Altes Push-Abo gelöscht.');
+            }
+        }
+        localStorage.removeItem(PUSH_VAPID_KEY_STORAGE);
+        await enablePushNotifications();
+    } catch (error) {
+        console.error('Resetting subscription failed:', error);
+        openPushModal('Zurücksetzen fehlgeschlagen. Versuche es über den normalen Aktivieren-Button.');
+    }
 }
 
 async function enablePushNotifications() {
@@ -676,57 +835,108 @@ async function enablePushNotifications() {
         return;
     }
 
-    try {
-        const register = await registerPushServiceWorker();
-        const permission = await Notification.requestPermission();
-        if (permission !== 'granted') {
-            openPushModal('Ohne erlaubte Benachrichtigungen kann ich nichts schicken. Bitte erlaube Push-Benachrichtigungen.');
-            return;
-        }
-
-        let subscription = await register.pushManager.getSubscription();
-        if (!subscription) {
-            subscription = await register.pushManager.subscribe({
-                userVisibleOnly: true,
-                applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
-            });
-        }
-
-        await syncPushSubscription(subscription);
-        closePushModal();
-    } catch (error) {
-        console.error('Fehler bei der Push-Registrierung:', error);
-        openPushModal('Die Aktivierung ist fehlgeschlagen. Bitte versuche es noch einmal.');
+    if (!VAPID_PUBLIC_KEY) {
+        openPushModal('Push-Benachrichtigungen sind serverseitig nicht konfiguriert.');
+        return;
     }
-}
 
-async function initPushNotifications() {
-    if (!canUsePushNotifications()) {
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+    const isStandalone = window.navigator.standalone === true || window.matchMedia('(display-mode: standalone)').matches;
+    if (isIOS && !isStandalone) {
+        openPushModal('Um Benachrichtigungen auf dem iPhone zu aktivieren, füge diese Seite zuerst über den Teilen-Button zum Home-Bildschirm hinzu und öffne sie von dort als App. 💕');
         return;
     }
 
     try {
         const register = await registerPushServiceWorker();
-        const subscription = await register.pushManager.getSubscription();
+        const permission = await Notification.requestPermission();
+        if (permission !== 'granted') {
+            openPushModal('Ohne erlaubte Benachrichtigungen können wir keine Push-Nachrichten senden. Bitte erlaube Benachrichtigungen in deinen Website-Einstellungen.');
+            updatePushStatusUI('denied');
+            return;
+        }
+
+        const subscription = await register.pushManager.subscribe({
+            userVisibleOnly: true,
+            applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
+        });
+
+        await syncPushSubscription(subscription);
+        closePushModal();
+        updatePushStatusUI('active');
+        alert('Super! Benachrichtigungen wurden erfolgreich aktiviert. 💕');
+    } catch (error) {
+        console.error('Fehler bei der Push-Registrierung:', error);
+        openPushModal('Die Aktivierung ist fehlgeschlagen. Bitte versuche es noch einmal.');
+        updatePushStatusUI('inactive');
+    }
+}
+
+async function initPushNotifications() {
+    if (!canUsePushNotifications()) {
+        updatePushStatusUI('unsupported');
+        return;
+    }
+
+    if (!VAPID_PUBLIC_KEY) {
+        updatePushStatusUI('unconfigured');
+        return;
+    }
+
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+    const isStandalone = window.navigator.standalone === true || window.matchMedia('(display-mode: standalone)').matches;
+    if (isIOS && !isStandalone) {
+        updatePushStatusUI('ios-not-pwa');
+        return;
+    }
+
+    try {
+        const register = await registerPushServiceWorker();
+        let subscription = await register.pushManager.getSubscription();
+
+        if (subscription) {
+            try {
+                const storedKey = localStorage.getItem(PUSH_VAPID_KEY_STORAGE);
+                if (!storedKey || storedKey !== VAPID_PUBLIC_KEY) {
+                    console.log('VAPID-Key geändert. Setze Abo zurück...');
+                    await subscription.unsubscribe();
+                    subscription = null;
+                }
+            } catch (error) {
+                console.warn('Fehler beim Prüfen des gespeicherten Keys:', error);
+            }
+        }
 
         if (subscription) {
             await syncPushSubscription(subscription);
+            updatePushStatusUI('active');
             return;
         }
 
         if (Notification.permission === 'granted') {
-            openPushModal('Benachrichtigungen sind noch nicht eingerichtet. Bitte aktiviere sie einmal per Klick.');
-            return;
+            try {
+                const newSub = await register.pushManager.subscribe({
+                    userVisibleOnly: true,
+                    applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
+                });
+                await syncPushSubscription(newSub);
+                updatePushStatusUI('active');
+            } catch (subErr) {
+                console.error('Fehler beim automatischen Abonnieren trotz Berechtigung:', subErr);
+                updatePushStatusUI('inactive');
+            }
+        } else if (Notification.permission === 'denied') {
+            updatePushStatusUI('denied');
+        } else {
+            updatePushStatusUI('inactive');
+            const promptDismissed = localStorage.getItem('push_modal_dismissed');
+            if (!promptDismissed) {
+                openPushModal('Damit du Benachrichtigungen für neue Erinnerungen und Nachrichten erhältst, aktiviere sie bitte per Klick.');
+            }
         }
-
-        if (Notification.permission === 'default') {
-            openPushModal('Damit Push-Benachrichtigungen aktiviert werden, musst du sie per Klick einschalten.');
-            return;
-        }
-
-        openPushModal('Benachrichtigungen sind im Browser deaktiviert. Bitte aktiviere sie in den Einstellungen oder per Klick hier.');
     } catch (error) {
         console.error('Fehler beim Vorbereiten der Push-Benachrichtigungen:', error);
+        updatePushStatusUI('inactive');
     }
 }
 
@@ -757,6 +967,54 @@ async function sendReminderPush() {
     }
 }
 
+let chatUnreadInterval = null;
+
+async function checkUnreadChatCount() {
+    try {
+        const response = await fetch('/api/chat/unread_count');
+        if (!response.ok) return;
+        const data = await response.json();
+        const count = data.unread_count || 0;
+
+        const desktopBadge = document.getElementById('chat-badge-desktop');
+        const mobileBadge = document.getElementById('chat-badge-mobile');
+
+        if (count > 0) {
+            if (desktopBadge) {
+                desktopBadge.textContent = count;
+                desktopBadge.style.display = 'flex';
+            }
+            if (mobileBadge) {
+                mobileBadge.textContent = count;
+                mobileBadge.style.display = 'flex';
+            }
+        } else {
+            if (desktopBadge) desktopBadge.style.display = 'none';
+            if (mobileBadge) mobileBadge.style.display = 'none';
+        }
+    } catch (error) {
+        console.warn('Konnte Anzahl ungelesener Nachrichten nicht abrufen:', error);
+    }
+}
+
+function initChatBadgePolling() {
+    checkUnreadChatCount();
+    chatUnreadInterval = setInterval(checkUnreadChatCount, 5000);
+}
+
+function initBottomNavActiveState() {
+    const currentPath = window.location.pathname;
+    const items = document.querySelectorAll('.bottom-nav-item');
+    items.forEach(item => {
+        const href = item.getAttribute('href');
+        if (currentPath === href) {
+            item.classList.add('is-active');
+        } else {
+            item.classList.remove('is-active');
+        }
+    });
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     // Set default creation form date to today
     const dateInput = document.getElementById("date");
@@ -774,13 +1032,27 @@ document.addEventListener('DOMContentLoaded', () => {
     setupTheme();
     initPushNotifications();
     initChatPage();
+    initChatBadgePolling();
+    initBottomNavActiveState();
 
     document.getElementById('enable-push-btn')?.addEventListener('click', enablePushNotifications);
     document.getElementById('close-push-modal-btn')?.addEventListener('click', closePushModal);
     document.getElementById('send-remind-btn')?.addEventListener('click', sendReminderPush);
+    
+    // Status button and testing actions
+    document.getElementById('push-status-btn')?.addEventListener('click', handlePushStatusClick);
+    document.getElementById('send-test-push-btn')?.addEventListener('click', sendTestPushNotification);
+    document.getElementById('disable-push-local-btn')?.addEventListener('click', forceReRegisterPush);
+    document.getElementById('close-push-info-modal-btn')?.addEventListener('click', closePushInfoModal);
+
     document.getElementById('push-modal')?.addEventListener('click', (e) => {
         if (e.target.id === 'push-modal') {
             closePushModal();
+        }
+    });
+    document.getElementById('push-info-modal')?.addEventListener('click', (e) => {
+        if (e.target.id === 'push-info-modal') {
+            closePushInfoModal();
         }
     });
     document.getElementById('remind-modal')?.addEventListener('click', (e) => {
@@ -794,5 +1066,7 @@ window.addEventListener('beforeunload', () => {
     if (chatRefreshInterval) {
         clearInterval(chatRefreshInterval);
     }
+    if (chatUnreadInterval) {
+        clearInterval(chatUnreadInterval);
+    }
 });
-

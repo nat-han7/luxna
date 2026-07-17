@@ -31,6 +31,7 @@ app.secret_key = os.environ["SECRET_KEY"]
 NA_LOGIN_PASSWORD = os.environ["NA_LOGIN_PASSWORD"]
 LU_LOGIN_PASSWORD = os.environ["LU_LOGIN_PASSWORD"]
 app.config["MAX_CONTENT_LENGTH"] = 16 * 1024 * 1024  # 16 MB limitL
+VAPID_PUBLIC_KEY = os.environ.get("VAPID_PUBLIC_KEY", "").strip()
 
 # ---------------------------------------------------------------------------
 # Supabase client (Now used for BOTH Database and Storage!)
@@ -50,6 +51,11 @@ def allowed_file(filename):
 
 def is_logged_in():
     return session.get("logged_in", False)
+
+
+@app.context_processor
+def inject_push_config():
+    return {"vapid_public_key": VAPID_PUBLIC_KEY}
 
 
 @app.before_request
@@ -274,6 +280,29 @@ def get_chat_messages():
         rows = []
 
     return jsonify({"messages": rows})
+@app.route("/api/chat/unread_count")
+def get_unread_chat_count():
+    if not is_logged_in():
+        return jsonify({"unread_count": 0}), 401
+
+    current_user = session.get("user")
+    partner = get_other_user(current_user)
+    if not partner:
+        return jsonify({"unread_count": 0})
+
+    try:
+        response = (
+            supabase.table("chat_messages")
+            .select("id, read_at")
+            .eq("sender", partner)
+            .eq("recipient", current_user)
+            .execute()
+        )
+        unread_count = sum(1 for row in (response.data or []) if not row.get("read_at"))
+        return jsonify({"unread_count": unread_count})
+    except Exception as e:
+        app.logger.error(f"Failed to fetch unread chat count: {e}")
+        return jsonify({"unread_count": 0})
 
 
 @app.route("/api/chat/send", methods=["POST"])
@@ -341,12 +370,19 @@ def add_entry():
             "storage_path": storage_path,
             "img_placeholder_str": img_placeholder_str
         }).execute()
-        threading.Thread(
-            target=send_push_notifications,
-            args=("Memorybook", "Hey, es gibt eine neue Erinnerung! 💕"),
-            kwargs={"url_path": "/gallery"},
-            daemon=True,
-        ).start()
+        current_user = session.get("user")
+        partner = get_other_user(current_user)
+        if partner:
+            threading.Thread(
+                target=send_push_notifications_to_user,
+                args=(
+                    partner,
+                    "Ein neuer Moment! 💕",
+                    f"{current_user.capitalize()} hat eine neue Erinnerung hinzugefügt: \"{title}\"",
+                    "/gallery",
+                ),
+                daemon=True,
+            ).start()
     except Exception as e:
         app.logger.error(f"Failed to insert entry: {e}")
 
@@ -456,8 +492,34 @@ def subscribe():
     except Exception as e:
         app.logger.error(f"Failed to save subscription: {e}")
         return jsonify({"error": "Database error"}), 500
-    
+
+
+@app.route("/api/push/test", methods=["POST"])
+def test_push_notification():
+    if not is_logged_in():
+        return jsonify({"error": "Unauthorized"}), 401
+
+    current_user = session.get("user")
+    if not current_user:
+        return jsonify({"error": "Unknown user"}), 400
+
+    threading.Thread(
+        target=send_push_notifications_to_user,
+        args=(
+            current_user,
+            "Test-Benachrichtigung 🔔",
+            f"Hallo {current_user.capitalize()}! Deine Benachrichtigungen funktionieren perfekt. 💕",
+            "/",
+        ),
+        daemon=True,
+    ).start()
+
+    return jsonify({"success": True})
+
+
 def send_push_notifications(title, message, url_path="/gallery"):
+    if message and len(message) > 120:
+        message = message[:117] + "..."
     try:
         # Hole alle aktiven Abos aus der Datenbank
         res = supabase.table("push_subscriptions").select("*").execute()
@@ -508,6 +570,8 @@ def send_push_notifications(title, message, url_path="/gallery"):
 
 
 def send_push_notifications_to_user(username, title, message, url_path="/gallery"):
+    if message and len(message) > 120:
+        message = message[:117] + "..."
     try:
         res = supabase.table("push_subscriptions").select("*").eq("user", username).execute()
         subscriptions = res.data or []
