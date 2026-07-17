@@ -12,6 +12,8 @@ from dotenv import load_dotenv
 from pywebpush import webpush, WebPushException
 import json
 import threading
+from urllib.parse import urlparse
+import time
 
 # Loads a local ".env" file if present
 load_dotenv()
@@ -260,18 +262,19 @@ def get_chat_messages():
         return jsonify({"messages": []})
 
     try:
+        # Filtert direkt in der DB: (sender=A UND recipient=B) ODER (sender=B UND recipient=A)
+        filter_str = f"and(sender.eq.{current_user},recipient.eq.{partner}),and(sender.eq.{partner},recipient.eq.{current_user})"
+        
         response = (
             supabase.table("chat_messages")
             .select("*")
+            .or_(filter_str)
             .order("created_at", desc=False)
             .limit(200)
             .execute()
         )
-        rows = [
-            normalize_chat_message_row(row)
-            for row in (response.data or [])
-            if {row.get("sender"), row.get("recipient")} <= {current_user, partner}
-        ]
+        
+        rows = [normalize_chat_message_row(row) for row in (response.data or [])]
 
         if rows:
             mark_chat_messages_read(partner, current_user)
@@ -280,6 +283,7 @@ def get_chat_messages():
         rows = []
 
     return jsonify({"messages": rows})
+
 @app.route("/api/chat/unread_count")
 def get_unread_chat_count():
     if not is_logged_in():
@@ -538,8 +542,6 @@ def send_push_notifications(title, message, url_path="/gallery"):
     if not vapid_contact.startswith("mailto:"):
         vapid_contact = f"mailto:{vapid_contact}"
 
-    vapid_claims = {"sub": vapid_contact}
-
     payload = json.dumps({
         "title": title,
         "body": message,
@@ -553,6 +555,13 @@ def send_push_notifications(title, message, url_path="/gallery"):
         if not endpoint or endpoint in seen_endpoints:
             continue
         seen_endpoints.add(endpoint)
+        parsed_url = urlparse(endpoint)
+        audience = f"{parsed_url.scheme}://{parsed_url.netloc}"
+        vapid_claims = {
+            "sub": vapid_contact,
+            "aud": audience,
+            "exp": int(time.time()) + 12 * 3600
+        }
         try:
             webpush(
                 subscription_info=sub_data,
