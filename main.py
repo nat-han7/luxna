@@ -14,6 +14,7 @@ import json
 import threading
 from urllib.parse import urlparse
 import time
+from utils.time_helpers import time_ago
 
 # Loads a local ".env" file if present
 load_dotenv()
@@ -156,15 +157,37 @@ def get_entries():
         return jsonify({"error": "Unauthorized"}), 401
 
     limit = request.args.get("limit", type=int)
+    sort = request.args.get("sort", "newest")  # newest, oldest
+    search = request.args.get("search", "")
 
     # Fetch entries from Supabase via API API-Client
     try:
-        query = supabase.table("journal_entry").select("*").order("created_at", desc=True)
+        query = supabase.table("journal_entry").select("*")
+        
+        # Apply search filter if provided
+        if search:
+            # Search in title and text fields
+            query = query.or_(f"title.ilike.%{search}%,text.ilike.%{search}%")
+        
+        # Apply sorting
+        if sort == "oldest":
+            query = query.order("created_at", desc=False)
+        else:  # default to newest
+            query = query.order("created_at", desc=True)
+        
         if limit:
             query = query.limit(limit)
         
         response = query.execute()
         entries_list = response.data
+        
+        # Add time_ago to each entry
+        for entry in entries_list:
+            if entry.get("date"):
+                entry["time_ago"] = time_ago(entry["date"])
+            else:
+                entry["time_ago"] = ""
+                
     except Exception as e:
         app.logger.error(f"Database fetch failed: {e}")
         entries_list = []

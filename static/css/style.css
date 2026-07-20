@@ -783,8 +783,8 @@ body.chat-fixed-layout .chat-shell {
 
     /* Adjust floating add button position so it stays above bottom nav */
     .floating-action-btn {
-        bottom: calc(75px + env(safe-area-inset-bottom));
-        right: var(--space-3);
+        bottom: calc(80px + env(safe-area-inset-bottom));
+        right: calc(var(--space-3) + env(safe-area-inset-right));
         width: 54px;
         height: 54px;
         font-size: 1.3rem;
@@ -815,4 +815,93 @@ body.chat-fixed-layout .chat-shell {
     #push-status-btn {
         margin-right: var(--space-2) !important;
     }
+}
+
+/* Additional Mobile Fixes for Very Small Screens */
+@media (max-width: 380px) {
+    /* Header layout fixes */
+    .brand-title {
+        font-size: 1rem;
+        max-width: 120px;
+    }
+    
+    .brand-icon {
+        font-size: 1.2rem;
+    }
+    
+    .header-actions {
+        gap: var(--space-2);
+    }
+    
+    /* Gallery grid fixes */
+    .gallery-grid {
+        grid-template-columns: 1fr;
+        gap: var(--space-3);
+    }
+    
+    .gallery-grid .card-title {
+        font-size: 1rem;
+        line-height: 1.3;
+    }
+    
+    .gallery-grid .card-image-wrapper {
+        aspect-ratio: 1 / 1; /* Square on very small screens */
+    }
+    
+    /* Chat interface fixes */
+    .chat-bubble {
+        max-width: 88%;
+        padding: 0.75rem 0.85rem;
+        font-size: 0.9rem;
+    }
+    
+    .chat-input {
+        min-height: 60px;
+        font-size: 16px; /* Prevent iOS zoom */
+    }
+    
+    .chat-actions .btn-submit {
+        padding: 0.6rem 0.8rem;
+        font-size: 0.85rem;
+    }
+    
+    /* Modal fixes for landscape */
+    @media (orientation: landscape) {
+        .modal-content {
+            max-height: 80vh;
+            width: 90%;
+            margin: auto;
+        }
+        
+        .modal-header {
+            padding: var(--space-2);
+        }
+        
+        .close-modal-btn {
+            padding: var(--space-2);
+            min-width: 44px;
+            min-height: 44px;
+        }
+    }
+    
+    /* Chat input safe area */
+    body.chat-fixed-layout .chat-composer {
+        padding-bottom: calc(var(--space-4) + env(safe-area-inset-bottom));
+    }
+}
+
+/* Touch Target Size Improvements */
+.bottom-nav-item {
+    min-height: 48px;
+    min-width: 48px;
+}
+
+.desktop-nav-link {
+    padding: var(--space-2) var(--space-3);
+    min-height: 44px;
+}
+
+#context-menu > div {
+    padding: var(--space-3) var(--space-4);
+    min-height: 44px;
 }

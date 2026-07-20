@@ -12,6 +12,70 @@
             padding: 0 var(--space-4);
         }
 
+        .gallery-header {
+            text-align: center;
+            margin-bottom: var(--space-5);
+        }
+
+        .gallery-controls {
+            display: flex;
+            gap: var(--space-3);
+            justify-content: center;
+            align-items: center;
+            flex-wrap: wrap;
+            margin-bottom: var(--space-5);
+        }
+
+        .search-container {
+            flex: 1;
+            max-width: 400px;
+            min-width: 280px;
+        }
+
+        .search-input {
+            width: 100%;
+            padding: 0.75rem var(--space-3);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-md);
+            background: var(--bg-card);
+            color: var(--text-main);
+            font-size: 0.95rem;
+            transition: border-color 0.25s ease, box-shadow 0.25s ease;
+        }
+
+        .search-input:focus {
+            outline: none;
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px rgba(255, 77, 109, 0.12);
+        }
+
+        .search-input::placeholder {
+            color: var(--text-muted);
+            opacity: 0.6;
+        }
+
+        .sort-container {
+            min-width: 180px;
+        }
+
+        .sort-select {
+            width: 100%;
+            padding: 0.75rem var(--space-3);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-md);
+            background: var(--bg-card);
+            color: var(--text-main);
+            font-size: 0.95rem;
+            cursor: pointer;
+            transition: border-color 0.25s ease, box-shadow 0.25s ease;
+        }
+
+        .sort-select:focus {
+            outline: none;
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px rgba(255, 77, 109, 0.12);
+        }
+
         /* Responsive Grid: Erstellt automatisch so viele Spalten wie Platz ist (mind. 280px breit) */
         .gallery-grid {
             display: grid;
@@ -78,11 +142,45 @@
             font-size: 0.85rem;
             color: var(--text-muted);
         }
+
+        .no-results {
+            text-align: center;
+            color: var(--text-muted);
+            padding: var(--space-5);
+            grid-column: 1 / -1;
+        }
+
+        @media (max-width: 600px) {
+            .gallery-controls {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .search-container,
+            .sort-container {
+                max-width: 100%;
+                min-width: auto;
+            }
+        }
     </style>
 
     <main class="gallery-container">
-        <h2 style="font-size: 1.6rem; margin-bottom: var(--space-1); text-align: center;">Unser gemeinsames Album</h2>
-        <p style="color: var(--text-muted); text-align: center; margin-bottom: var(--space-5);">Klick auf ein Bild, um unsere Geschichte dahinter zu lesen.</p>
+        <div class="gallery-header">
+            <h2 style="font-size: 1.6rem; margin-bottom: var(--space-1);">Unser gemeinsames Album</h2>
+            <p style="color: var(--text-muted); margin-bottom: var(--space-4);">Klick auf ein Bild, um unsere Geschichte dahinter zu lesen.</p>
+        </div>
+        
+        <div class="gallery-controls">
+            <div class="search-container">
+                <input type="text" id="search-input" class="search-input" placeholder="Erinnerungen suchen...">
+            </div>
+            <div class="sort-container">
+                <select id="sort-select" class="sort-select">
+                    <option value="newest">Neueste zuerst</option>
+                    <option value="oldest">Älteste zuerst</option>
+                </select>
+            </div>
+        </div>
         
         <div class="gallery-grid" id="entries-container">
             <!-- Skeleton Loader while content is fetched via API -->
@@ -130,4 +228,97 @@
             </div>
         </div>
     </main>
+
+    <script>
+        // Search and sort functionality
+        const searchInput = document.getElementById('search-input');
+        const sortSelect = document.getElementById('sort-select');
+        let searchTimeout;
+
+        function loadGalleryEntries() {
+            const container = document.getElementById('entries-container');
+            const searchTerm = searchInput.value.trim();
+            const sortOrder = sortSelect.value;
+            
+            let url = '/api/entries';
+            const params = new URLSearchParams();
+            
+            if (searchTerm) {
+                params.append('search', searchTerm);
+            }
+            if (sortOrder) {
+                params.append('sort', sortOrder);
+            }
+            
+            if (params.toString()) {
+                url += '?' + params.toString();
+            }
+            
+            fetch(url)
+                .then(res => res.json())
+                .then(data => {
+                    container.innerHTML = '';
+                    globalEntriesData = data.entries;
+
+                    if (data.entries.length === 0) {
+                        container.innerHTML = `<div class="no-results">Keine Erinnerungen gefunden${searchTerm ? ' für "' + searchTerm + '"' : ''}.</div>`;
+                        return;
+                    }
+
+                    data.entries.forEach(entry => {
+                        let imgHTML = '';
+                        
+                        if (entry.image_url) {
+                            const placeholderStyle = entry.img_placeholder_str 
+                                ? `style="background-image: url('${entry.img_placeholder_str}'); background-size: cover; filter: blur(10px); transform: scale(1.05); transition: filter 0.6s ease;"` 
+                                : '';
+                            
+                            imgHTML = `
+                            <div class="card-image-wrapper" ${placeholderStyle}>
+                                <img data-src="${entry.image_url}" alt="${entry.title}" style="opacity: 0; transition: opacity 0.5s ease; width:100%; height:100%; object-fit:cover;" onload="this.style.opacity='1'; this.parentElement.style.filter='none';" onerror="this.style.opacity='1'; this.parentElement.style.filter='none'; this.classList.add('image-error');">
+                            </div>`;
+                        }
+
+                        const cardHTML = `
+                            <div class="memory-card" data-id="${entry.id}">
+                                ${imgHTML}
+                                <div class="card-content">
+                                    <div class="card-header-flex">
+                                        <h4 class="card-title">${entry.title}</h4>
+                                        <span class="card-date">${formatDateForDisplay(entry.date)}</span>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                        container.insertAdjacentHTML('beforeend', cardHTML);
+                    });
+
+                    container.querySelectorAll('.card-image-wrapper img').forEach(img => {
+                        if (img.getAttribute('src') && img.complete) {
+                            img.style.opacity = '1';
+                            if (img.parentElement) img.parentElement.style.filter = 'none';
+                        }
+                    });
+
+                    setupLazyLoading();
+                    setupInteractionFeatures();
+                })
+                .catch(err => {
+                    console.error("Fehler beim Laden:", err);
+                    container.innerHTML = `<div class="no-results">Die Erinnerungen konnten gerade nicht geladen werden. Bitte lade die Seite neu.</div>`;
+                });
+        }
+
+        // Debounced search
+        searchInput.addEventListener('input', () => {
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(loadGalleryEntries, 600);
+        });
+
+        // Sort change
+        sortSelect.addEventListener('change', loadGalleryEntries);
+
+        // Initial load
+        loadGalleryEntries();
+    </script>
 {% endblock %}

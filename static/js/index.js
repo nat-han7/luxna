@@ -413,6 +413,10 @@ function loadEntries() {
                     }
                 }
 
+                const timeAgoHTML = entry.time_ago 
+                    ? `<span class="card-time-ago" style="font-size: 0.75rem; color: var(--accent); font-weight: 600; background: rgba(255, 77, 109, 0.1); padding: 2px 8px; border-radius: 12px;">${entry.time_ago}</span>` 
+                    : '';
+                
                 const cardHTML = `
                     <div class="memory-card" data-id="${entry.id}">
                         ${imgHTML}
@@ -421,6 +425,7 @@ function loadEntries() {
                                 <h4 class="card-title">${entry.title}</h4>
                                 <span class="card-date">${formatDateForDisplay(entry.date)}</span>
                             </div>
+                            ${timeAgoHTML ? `<div style="margin-top: var(--space-2);">${timeAgoHTML}</div>` : ''}
                         </div>
                     </div>
                 `;
