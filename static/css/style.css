@@ -905,3 +905,221 @@ body.chat-fixed-layout .chat-shell {
     padding: var(--space-3) var(--space-4);
     min-height: 44px;
 }
+
+/* In-App Notification Toast */
+.in-app-notification {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 9999;
+    transform: translateX(120%);
+    opacity: 0;
+    transition: transform 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55), opacity 0.4s ease;
+    pointer-events: none;
+}
+
+.in-app-notification.is-visible {
+    transform: translateX(0);
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.in-app-notification-content {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-3);
+    background: var(--bg-card);
+    border-radius: var(--radius-md);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
+    padding: var(--space-3);
+    min-width: 320px;
+    max-width: 400px;
+    border: 1px solid var(--border-color);
+}
+
+.in-app-notification-icon {
+    flex-shrink: 0;
+    width: 40px;
+    height: 40px;
+    background: var(--accent);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 1.1rem;
+}
+
+.in-app-notification-text {
+    flex: 1;
+    min-width: 0;
+}
+
+.in-app-notification-title {
+    font-weight: 600;
+    font-size: 0.95rem;
+    color: var(--text-main);
+    margin-bottom: 4px;
+}
+
+.in-app-notification-body {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    line-height: 1.4;
+}
+
+.in-app-notification-close {
+    flex-shrink: 0;
+    width: 32px;
+    height: 32px;
+    border: none;
+    background: transparent;
+    border-radius: var(--radius-sm);
+    color: var(--text-muted);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+    font-size: 0.9rem;
+}
+
+.in-app-notification-close:hover {
+    background: var(--soft-grey);
+    color: var(--text-main);
+}
+
+.in-app-notification-close:active {
+    transform: scale(0.95);
+}
+
+/* Mobile positioning for in-app notifications */
+@media (max-width: 768px) {
+    .in-app-notification {
+        top: auto;
+        bottom: calc(90px + env(safe-area-inset-bottom));
+        right: var(--space-3);
+        left: var(--space-3);
+        transform: translateY(120%);
+    }
+
+    .in-app-notification.is-visible {
+        transform: translateY(0);
+    }
+
+    .in-app-notification-content {
+        min-width: auto;
+        max-width: none;
+    }
+}
+
+/* PWA Install Banner */
+.pwa-install-banner {
+    position: fixed;
+    bottom: calc(80px + env(safe-area-inset-bottom));
+    left: var(--space-3);
+    right: var(--space-3);
+    z-index: 9998;
+    animation: slideUp 0.4s ease;
+}
+
+@keyframes slideUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.pwa-install-banner-content {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    background: var(--bg-card);
+    border-radius: var(--radius-lg);
+    padding: var(--space-3);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
+    border: 1px solid var(--border-color);
+}
+
+.pwa-install-banner-icon {
+    flex-shrink: 0;
+    width: 48px;
+    height: 48px;
+    background: var(--accent);
+    border-radius: var(--radius-md);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+    color: white;
+}
+
+.pwa-install-banner-text {
+    flex: 1;
+    min-width: 0;
+}
+
+.pwa-install-banner-title {
+    font-weight: 600;
+    font-size: 0.95rem;
+    color: var(--text-main);
+    margin-bottom: 2px;
+}
+
+.pwa-install-banner-subtitle {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+}
+
+.pwa-install-banner-btn {
+    flex-shrink: 0;
+    padding: var(--space-2) var(--space-4);
+    background: var(--accent);
+    color: white;
+    border: none;
+    border-radius: var(--radius-md);
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+}
+
+.pwa-install-banner-btn:hover {
+    background: var(--accent-dark);
+    transform: translateY(-1px);
+}
+
+.pwa-install-banner-dismiss {
+    flex-shrink: 0;
+    width: 32px;
+    height: 32px;
+    background: transparent;
+    border: none;
+    border-radius: var(--radius-sm);
+    color: var(--text-muted);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+    font-size: 0.9rem;
+}
+
+.pwa-install-banner-dismiss:hover {
+    background: var(--soft-grey);
+    color: var(--text-main);
+}
+
+@media (min-width: 769px) {
+    .pwa-install-banner {
+        bottom: var(--space-4);
+        right: var(--space-4);
+        left: auto;
+        max-width: 400px;
+    }
+}

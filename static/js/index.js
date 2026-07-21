@@ -973,6 +973,158 @@ async function sendReminderPush() {
 }
 
 let chatUnreadInterval = null;
+let inAppNotificationTimeout = null;
+let currentNotificationUrl = null;
+
+function isChatFocused() {
+    // Check if we're on the chat page
+    return window.location.pathname === '/chat';
+}
+
+function showInAppNotification(title, body, url = '/') {
+    // Don't show in-app notification if chat is focused
+    if (isChatFocused()) {
+        return;
+    }
+
+    const notification = document.getElementById('in-app-notification');
+    const titleEl = document.getElementById('in-app-title');
+    const bodyEl = document.getElementById('in-app-body');
+    
+    if (!notification || !titleEl || !bodyEl) return;
+    
+    titleEl.textContent = title;
+    bodyEl.textContent = body;
+    currentNotificationUrl = url;
+    
+    notification.classList.add('is-visible');
+    
+    // Auto-hide after 5 seconds
+    clearTimeout(inAppNotificationTimeout);
+    inAppNotificationTimeout = setTimeout(() => {
+        notification.classList.remove('is-visible');
+    }, 5000);
+}
+
+function hideInAppNotification() {
+    const notification = document.getElementById('in-app-notification');
+    if (notification) {
+        notification.classList.remove('is-visible');
+    }
+    clearTimeout(inAppNotificationTimeout);
+    currentNotificationUrl = null;
+}
+
+function handleNotificationClick() {
+    if (currentNotificationUrl) {
+        window.location.href = currentNotificationUrl;
+    }
+    hideInAppNotification();
+}
+
+// Listen for messages from service worker
+if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.addEventListener('message', function(event) {
+        if (event.data && event.data.type === 'PUSH_NOTIFICATION') {
+            showInAppNotification(event.data.title, event.data.body, event.data.url);
+        }
+    });
+}
+
+// PWA Install Prompt with beforeinstallprompt
+let deferredPrompt = null;
+let pwaInstallDismissed = false;
+
+function showPWAInstallBanner() {
+    const banner = document.getElementById('pwa-install-banner');
+    if (banner && !pwaInstallDismissed) {
+        banner.style.display = 'block';
+    }
+}
+
+function hidePWAInstallBanner() {
+    const banner = document.getElementById('pwa-install-banner');
+    if (banner) {
+        banner.style.display = 'none';
+    }
+}
+
+function dismissPWAInstallBanner() {
+    pwaInstallDismissed = true;
+    localStorage.setItem('pwa_install_dismissed', Date.now().toString());
+    hidePWAInstallBanner();
+}
+
+// Listen for beforeinstallprompt event
+window.addEventListener('beforeinstallprompt', (e) => {
+    console.log('beforeinstallprompt event fired');
+    // Prevent Chrome 67 and earlier from automatically showing the prompt
+    e.preventDefault();
+    
+    // Stash the event so it can be triggered later
+    deferredPrompt = e;
+    
+    // Check if user has dismissed it recently
+    const dismissed = localStorage.getItem('pwa_install_dismissed');
+    if (dismissed) {
+        const dismissedTime = parseInt(dismissed, 10);
+        const oneWeek = 7 * 24 * 60 * 60 * 1000;
+        if (Date.now() - dismissedTime < oneWeek) {
+            console.log('PWA install dismissed recently, not showing banner');
+            return; // Don't show if dismissed less than a week ago
+        }
+    }
+    
+    // Show the install banner after a short delay
+    setTimeout(() => {
+        console.log('Showing PWA install banner');
+        showPWAInstallBanner();
+    }, 2000);
+});
+
+// Listen for app installed event
+window.addEventListener('appinstalled', () => {
+    // Clear the deferredPrompt
+    deferredPrompt = null;
+    // Hide the banner
+    hidePWAInstallBanner();
+});
+
+// Handle install button click
+document.getElementById('pwa-install-btn')?.addEventListener('click', async (e) => {
+    if (!deferredPrompt) {
+        return;
+    }
+    
+    // Show the install prompt
+    deferredPrompt.prompt();
+    
+    // Wait for the user to respond to the prompt
+    const { outcome } = await deferredPrompt.userChoice;
+    
+    // Clear the deferredPrompt
+    deferredPrompt = null;
+    
+    // Hide the banner regardless of outcome
+    hidePWAInstallBanner();
+    
+    // Log the outcome
+    console.log(`User response to install prompt: ${outcome}`);
+});
+
+// Handle dismiss button click
+document.getElementById('pwa-install-dismiss-btn')?.addEventListener('click', dismissPWAInstallBanner);
+
+function initPWAInstallPrompt() {
+    // Check if already installed as PWA
+    const isStandalone = window.navigator.standalone === true || window.matchMedia('(display-mode: standalone)').matches;
+    if (isStandalone) {
+        return;
+    }
+    
+    // The beforeinstallprompt event will handle showing the banner
+    // No need for manual detection anymore
+}
 
 async function checkUnreadChatCount() {
     try {
@@ -1039,6 +1191,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initChatPage();
     initChatBadgePolling();
     initBottomNavActiveState();
+    initPWAInstallPrompt();
 
     document.getElementById('enable-push-btn')?.addEventListener('click', enablePushNotifications);
     document.getElementById('close-push-modal-btn')?.addEventListener('click', closePushModal);
@@ -1049,6 +1202,20 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('send-test-push-btn')?.addEventListener('click', sendTestPushNotification);
     document.getElementById('disable-push-local-btn')?.addEventListener('click', forceReRegisterPush);
     document.getElementById('close-push-info-modal-btn')?.addEventListener('click', closePushInfoModal);
+
+    document.getElementById('in-app-close-btn')?.addEventListener('click', hideInAppNotification);
+    
+    // Make the entire notification clickable
+    const inAppNotification = document.getElementById('in-app-notification');
+    if (inAppNotification) {
+        inAppNotification.addEventListener('click', (e) => {
+            // Don't navigate if clicking the close button
+            if (e.target.closest('#in-app-close-btn')) {
+                return;
+            }
+            handleNotificationClick();
+        });
+    }
 
     document.getElementById('push-modal')?.addEventListener('click', (e) => {
         if (e.target.id === 'push-modal') {

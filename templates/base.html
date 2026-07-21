@@ -194,6 +194,39 @@
         </div>
     </div>
 
+    <!-- In-App Notification Toast -->
+    <div id="in-app-notification" class="in-app-notification">
+        <div class="in-app-notification-content">
+            <div class="in-app-notification-icon">
+                <i class="fa-solid fa-bell"></i>
+            </div>
+            <div class="in-app-notification-text">
+                <div class="in-app-notification-title" id="in-app-title">Neue Erinnerung!</div>
+                <div class="in-app-notification-body" id="in-app-body">Es gibt etwas Neues im Tagebuch! ✨</div>
+            </div>
+            <button class="in-app-notification-close" id="in-app-close-btn">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+        </div>
+    </div>
+
+    <!-- PWA Install Button (shown when beforeinstallprompt fires) -->
+    <div id="pwa-install-banner" class="pwa-install-banner" style="display: none;">
+        <div class="pwa-install-banner-content">
+            <div class="pwa-install-banner-icon">
+                <i class="fa-solid fa-heart"></i>
+            </div>
+            <div class="pwa-install-banner-text">
+                <div class="pwa-install-banner-title">Installiere Memorybook 💕</div>
+                <div class="pwa-install-banner-subtitle">Für die beste Erfahrung</div>
+            </div>
+            <button id="pwa-install-btn" class="pwa-install-banner-btn">Installieren</button>
+            <button id="pwa-install-dismiss-btn" class="pwa-install-banner-dismiss">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+        </div>
+    </div>
+
     <!-- Bottom Navigation Bar for Mobile -->
     <nav class="bottom-nav">
         <a href="/" class="bottom-nav-item">

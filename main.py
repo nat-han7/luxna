@@ -537,6 +537,7 @@ def test_push_notification():
             "Test-Benachrichtigung 🔔",
             f"Hallo {current_user.capitalize()}! Deine Benachrichtigungen funktionieren perfekt. 💕",
             "/",
+            True,  # isTest flag
         ),
         daemon=True,
     ).start()
@@ -544,7 +545,7 @@ def test_push_notification():
     return jsonify({"success": True})
 
 
-def send_push_notifications(title, message, url_path="/gallery"):
+def send_push_notifications(title, message, url_path="/gallery", isTest=False):
     if message and len(message) > 120:
         message = message[:117] + "..."
     try:
@@ -568,7 +569,8 @@ def send_push_notifications(title, message, url_path="/gallery"):
     payload = json.dumps({
         "title": title,
         "body": message,
-        "url": url_path
+        "url": url_path,
+        "isTest": isTest
     })
 
     seen_endpoints = set()
@@ -601,7 +603,7 @@ def send_push_notifications(title, message, url_path="/gallery"):
             app.logger.error(f"Unexpected push error: {e}")
 
 
-def send_push_notifications_to_user(username, title, message, url_path="/gallery"):
+def send_push_notifications_to_user(username, title, message, url_path="/gallery", isTest=False):
     if message and len(message) > 120:
         message = message[:117] + "..."
     try:
@@ -623,7 +625,8 @@ def send_push_notifications_to_user(username, title, message, url_path="/gallery
     payload = json.dumps({
         "title": title,
         "body": message,
-        "url": url_path
+        "url": url_path,
+        "isTest": isTest
     })
 
     seen_endpoints = set()
