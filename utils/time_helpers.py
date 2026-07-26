@@ -32,51 +32,51 @@ def time_ago(date_str: str, date_format: str = "%Y-%m-%d") -> str:
         
         # Handle future dates
         if delta_days < 0:
-            return "in the future"
+            return "in Zukunft"
         
         # Today
         if delta_days == 0:
-            return "today"
+            return "heute"
         
         # Yesterday
         if delta_days == 1:
-            return "yesterday"
+            return "gestern"
         
         # This week
         if delta_days < 7:
-            return f"{delta_days} days ago"
+            return f"vor {delta_days} Tagen"
         
         # Last week
         if delta_days < 14:
-            return "last week"
+            return "letzte Woche"
         
         # Weeks
         if delta_days < 30:
             weeks = delta_days // 7
             if weeks == 1:
-                return "1 week ago"
-            return f"{weeks} weeks ago"
+                return "vor 1 Woche"
+            return f"vor {weeks} Wochen"
         
         # Last month
         if delta_days < 60:
-            return "last month"
+            return "letzten Monat"
         
         # Months
         if delta_days < 365:
             months = delta_days // 30
             if months == 1:
-                return "1 month ago"
-            return f"{months} months ago"
+                return "vor 1 Monat"
+            return f"vor {months} Monaten"
         
         # Last year
         if delta_days < 730:
-            return "last year"
+            return "letztes Jahr"
         
         # Years
         years = delta_days // 365
         if years == 1:
-            return "1 year ago"
-        return f"{years} years ago"
+            return "vor 1 Jahr"
+        return f"vor {years} Jahren"
         
     except (ValueError, TypeError) as e:
         # If date parsing fails, return the original string
