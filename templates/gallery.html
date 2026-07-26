@@ -143,6 +143,30 @@
             color: var(--text-muted);
         }
 
+        .gallery-grid .card-header-flex {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .gallery-grid .card-date-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .gallery-grid .card-time-ago {
+            display: inline-block;
+            width: fit-content;
+            font-size: 0.75rem;
+            color: var(--accent);
+            background: color-mix(in srgb, var(--accent) 12%, transparent);
+            border: 1px solid color-mix(in srgb, var(--accent) 25%, transparent);
+            border-radius: 999px;
+            padding: 2px 10px;
+        }
+
         .no-results {
             text-align: center;
             color: var(--text-muted);
@@ -172,10 +196,10 @@
         
         <div class="gallery-controls">
             <div class="search-container">
-                <input type="text" id="search-input" class="search-input" placeholder="Erinnerungen suchen...">
+                <input type="text" id="search-input" class="search-input" placeholder="Erinnerungen suchen..." autocomplete="off">
             </div>
             <div class="sort-container">
-                <select id="sort-select" class="sort-select">
+                <select id="sort-select" class="sort-select" autocomplete="off">
                     <option value="newest">Neueste zuerst</option>
                     <option value="oldest">Älteste zuerst</option>
                 </select>
@@ -235,10 +259,30 @@
         const sortSelect = document.getElementById('sort-select');
         let searchTimeout;
 
+        const STORAGE_KEY_SEARCH = 'gallery_search';
+        const STORAGE_KEY_SORT = 'gallery_sort';
+
+        // Gespeicherten Zustand wiederherstellen (z.B. nach Öffnen eines Eintrags oder Reload)
+        function restoreGalleryState() {
+            const savedSearch = sessionStorage.getItem(STORAGE_KEY_SEARCH);
+            const savedSort = sessionStorage.getItem(STORAGE_KEY_SORT);
+
+            if (savedSearch !== null) {
+                searchInput.value = savedSearch;
+            }
+            if (savedSort !== null) {
+                sortSelect.value = savedSort;
+            }
+        }
+
         function loadGalleryEntries() {
             const container = document.getElementById('entries-container');
             const searchTerm = searchInput.value.trim();
             const sortOrder = sortSelect.value;
+
+            // Aktuellen Zustand merken, damit er erhalten bleibt
+            sessionStorage.setItem(STORAGE_KEY_SEARCH, searchTerm);
+            sessionStorage.setItem(STORAGE_KEY_SORT, sortOrder);
             
             let url = '/api/entries';
             const params = new URLSearchParams();
@@ -285,7 +329,10 @@
                                 <div class="card-content">
                                     <div class="card-header-flex">
                                         <h4 class="card-title">${entry.title}</h4>
-                                        <span class="card-date">${formatDateForDisplay(entry.date)}</span>
+                                        <div class="card-date-row">
+                                            <span class="card-date">${formatDateForDisplay(entry.date)}</span>
+                                            ${entry.time_ago ? `<span class="card-time-ago">${entry.time_ago}</span>` : ''}
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -318,7 +365,13 @@
         // Sort change
         sortSelect.addEventListener('change', loadGalleryEntries);
 
-        // Initial load
-        loadGalleryEntries();
+        // pageshow statt direktem Aufruf: feuert zuverlässig NACH der nativen
+        // Formular-Wiederherstellung des Browsers (z.B. beim Zurück-Navigieren
+        // von einem Eintrag), sodass unser Zustand (sessionStorage) das letzte
+        // Wort hat und Dropdown + angezeigte Einträge immer synchron sind.
+        window.addEventListener('pageshow', () => {
+            restoreGalleryState();
+            loadGalleryEntries();
+        });
     </script>
 {% endblock %}

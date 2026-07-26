@@ -16,6 +16,21 @@ from urllib.parse import urlparse
 import time
 from utils.time_helpers import time_ago
 
+import hashlib
+import re
+from datetime import date
+
+# Schlüsselwörter, die auf besonders emotionale/bedeutsame Einträge hindeuten
+EMOTIONAL_KEYWORDS = [
+    "liebe", "geliebt", "immer", "für immer", "glücklich", "glück",
+    "das erste mal", "premiere", "meilenstein", "jahrestag", "verlobt",
+    "heirat", "vermisse", "vermisst", "wunderschön", "unglaublich",
+    "perfekt", "magisch", "besonders", "unvergesslich", "danke",
+    "dankbar", "stolz", "geschafft", "endlich"
+]
+
+EMOJI_PATTERN = re.compile(r'[\U0001F300-\U0001FAFF\u2600-\u27BF]')
+
 # Loads a local ".env" file if present
 load_dotenv()
 
@@ -151,46 +166,121 @@ def logout():
     return redirect(url_for("login"))
 
 
+def compute_highlight_score(entry: dict, seed_date: date) -> float:
+    """
+    Schneller heuristischer 'Mini-Highlight-Algorithmus'. Kein ML-Modell, keine
+    externen Calls - läuft in Mikrosekunden pro Eintrag. Kombiniert Content-Signale
+    (Textlänge, emotionale Sprache, Bild vorhanden) mit Datums-Signalen (On-this-day,
+    Jahrestags-Nähe) und einem tagesbasierten Zufalls-Seed für Abwechslung.
+    """
+    text = (entry.get("text") or "").lower()
+    title = (entry.get("title") or "").lower()
+    combined = f"{title} {text}"
+    score = 0.0
+
+    # --- Content-Signale ---
+    keyword_hits = sum(1 for kw in EMOTIONAL_KEYWORDS if kw in combined)
+    score += keyword_hits * 8
+
+    score += min(text.count("!"), 5) * 2
+    emoji_count = len(EMOJI_PATTERN.findall(combined))
+    score += min(emoji_count, 5) * 3
+
+    length = len(text)
+    if 150 <= length <= 1200:
+        score += 10
+    elif length > 1200:
+        score += 5
+
+    if entry.get("image_url"):
+        score += 12
+
+    # --- Datums-Signale ---
+    entry_date_str = entry.get("date")
+    if entry_date_str:
+        try:
+            y, m, d = map(int, entry_date_str.split("-"))
+            entry_date = date(y, m, d)
+
+            # "Am selben Tag vor X Jahren" - klassischer On-this-day-Bonus
+            if entry_date.month == seed_date.month and entry_date.day == seed_date.day:
+                score += 40
+
+            # Nähe zum gemeinsamen Jahrestag (27. April)
+            if entry_date.month == 4 and entry_date.day == 27:
+                score += 20
+        except (ValueError, TypeError):
+            pass
+
+    # --- Seed-basierte Variation ---
+    # Deterministischer Pseudo-Zufall pro Tag + Eintrag: sorgt für Abwechslung
+    # ohne dass echte Zufälligkeit bei jedem Reload die Reihenfolge durcheinanderwirbelt.
+    seed_str = f"{entry.get('id')}-{seed_date.isoformat()}"
+    seed_hash = int(hashlib.sha256(seed_str.encode()).hexdigest(), 16)
+    jitter = (seed_hash % 1000) / 1000 * 15  # 0-15 Punkte Rauschen
+    score += jitter
+
+    return score
+
+
 @app.route("/api/entries")
 def get_entries():
     if not is_logged_in():
         return jsonify({"error": "Unauthorized"}), 401
 
     limit = request.args.get("limit", type=int)
-    sort = request.args.get("sort", "newest")  # newest, oldest
+    sort = request.args.get("sort", "newest")  # newest, oldest, highlights
     search = request.args.get("search", "")
 
-    # Fetch entries from Supabase via API API-Client
+    SORT_COLUMN = "date"
+
     try:
         query = supabase.table("journal_entry").select("*")
-        
-        # Apply search filter if provided
+
         if search:
-            # Search in title and text fields
-            query = query.or_(f"title.ilike.%{search}%,text.ilike.%{search}%")
-        
-        # Apply sorting
-        if sort == "oldest":
-            query = query.order("created_at", desc=False)
-        else:  # default to newest
-            query = query.order("created_at", desc=True)
-        
-        if limit:
-            query = query.limit(limit)
-        
+            safe_search = (
+                search.replace("\\", "\\\\")
+                      .replace(",", "\\,")
+                      .replace("(", "\\(")
+                      .replace(")", "\\)")
+                      .replace("%", "\\%")
+                      .replace("_", "\\_")
+            )
+            query = query.or_(f"title.ilike.%{safe_search}%,text.ilike.%{safe_search}%")
+
+        if sort == "highlights":
+            query = query.order(SORT_COLUMN, desc=True)
+        elif sort == "oldest":
+            query = query.order(SORT_COLUMN, desc=False)
+            if limit:
+                query = query.limit(limit)
+        else:  # newest (default)
+            query = query.order(SORT_COLUMN, desc=True)
+            if limit:
+                query = query.limit(limit)
+
         response = query.execute()
         entries_list = response.data
-        
-        # Add time_ago to each entry
+
+        if sort == "highlights":
+            seed_date = date.today()
+            for entry in entries_list:
+                entry["_highlight_score"] = compute_highlight_score(entry, seed_date)
+            entries_list.sort(key=lambda e: e["_highlight_score"], reverse=True)
+            for entry in entries_list:
+                del entry["_highlight_score"]
+            if limit:
+                entries_list = entries_list[:limit]
+
         for entry in entries_list:
             if entry.get("date"):
                 entry["time_ago"] = time_ago(entry["date"])
             else:
                 entry["time_ago"] = ""
-                
+
     except Exception as e:
         app.logger.error(f"Database fetch failed: {e}")
-        entries_list = []
+        return jsonify({"error": "Fehler beim Laden der Erinnerungen"}), 500
 
     return jsonify({"entries": entries_list})
 

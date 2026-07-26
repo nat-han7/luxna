@@ -1,4 +1,4 @@
-// Anniversary Configuration: April 27, 2026 (Month is 0-indexed, so 3 is April)
+﻿// Anniversary Configuration: April 27, 2026 (Month is 0-indexed, so 3 is April)
 const anniversaryDate = new Date(2026, 3, 27, 16, 0, 0); 
 
 function formatDateForDisplay(dateStr) {
@@ -113,7 +113,14 @@ function updateReminderButtonLabel() {
 
 function closeDetailModal() {
     document.getElementById('detail-modal')?.classList.remove('is-active');
-    clearEntryIdFromUrl();
+    // Falls die aktuelle History-Position vom Öffnen des Modals stammt (pushState
+    // mit entryId), gehen wir einen Schritt zurück, damit Vor-/Zurück-Navigation
+    // konsistent bleibt. Sonst (z.B. Deep-Link direkt geöffnet) URL einfach bereinigen.
+    if (history.state && history.state.entryId) {
+        history.back();
+    } else {
+        clearEntryIdFromUrl();
+    }
 }
 
 function closeReminderModal() {
@@ -378,7 +385,7 @@ function loadEntries() {
     if (!container) return;
 
     const isGallery = window.location.pathname === '/gallery';
-    const endpoint = isGallery ? '/api/entries' : '/api/entries?limit=3';
+    const endpoint = isGallery ? '/api/entries' : '/api/entries?limit=3&sort=highlights';
 
     fetch(endpoint)
         .then(res => res.json())
@@ -534,9 +541,20 @@ function setupInteractionFeatures() {
                 e.preventDefault();
                 return;
             }
-            window.location.href = `/gallery?id=${entry.id}`;
+            openEntryFromCard(entry);
         });
     });
+}
+
+// Öffnet den Eintrag als Modal statt die Seite neu zu laden. Die URL wird trotzdem
+// per pushState aktualisiert (Deep-Linking, Teilen, Push-Erinnerungen bleiben so
+// funktionsfähig), aber Galerie-Zustand (Suche/Sortierung) geht dabei nie verloren.
+function openEntryFromCard(entry) {
+    if (!entry) return;
+    const url = new URL(window.location.href);
+    url.searchParams.set('id', entry.id);
+    history.pushState({ entryId: entry.id }, '', url);
+    openDetailModal(entry);
 }
 
 function openEditModal(entry) {
@@ -576,6 +594,23 @@ function setupManagementModals() {
     document.getElementById('context-edit')?.addEventListener('click', () => openEditModal(currentSelectedEntry));
     document.getElementById('context-delete')?.addEventListener('click', () => deleteEntryHandler(currentSelectedEntry.id));
 }
+
+// Synchronisiert das Modal mit dem Browser-Verlauf: Zurück-Button schließt das
+// Modal (statt die Seite zu verlassen), Vorwärts öffnet es wieder.
+window.addEventListener('popstate', () => {
+    const requestedEntryId = getEntryIdFromUrl();
+    const modal = document.getElementById('detail-modal');
+
+    if (requestedEntryId) {
+        const requestedEntry = globalEntriesData.find(entry => entry.id === requestedEntryId);
+        if (requestedEntry) {
+            openDetailModal(requestedEntry);
+            return;
+        }
+    }
+
+    modal?.classList.remove('is-active');
+});
 
 function setupTheme() {
     const toggleBtn = document.getElementById('theme-toggle-btn');
