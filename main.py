@@ -1,10 +1,11 @@
-from flask import Flask, render_template, request, redirect, url_for, session, jsonify
+from flask import Flask, render_template, request, redirect, url_for, session, jsonify, abort
 import os
 import base64
 import uuid
 from io import BytesIO
 from datetime import datetime
 from datetime import timedelta
+from functools import wraps
 from PIL import Image
 import pi_heif
 from supabase import create_client, Client
@@ -19,6 +20,10 @@ from utils.time_helpers import time_ago
 import hashlib
 import re
 from datetime import date
+
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
+from werkzeug.security import check_password_hash
 
 # Schlüsselwörter, die auf besonders emotionale/bedeutsame Einträge hindeuten
 EMOTIONAL_KEYWORDS = [
@@ -41,13 +46,23 @@ app = Flask(__name__)
 app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(days=90)
 app.config["SESSION_COOKIE_HTTPONLY"] = True
 app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
+# Cookie darf nur über HTTPS übertragen werden (Render nutzt immer HTTPS).
+# Lokal mit "flask run" ohne HTTPS ggf. auf False setzen, sonst funktioniert Login nicht.
+app.config["SESSION_COOKIE_SECURE"] = os.environ.get("FLASK_ENV") != "development"
 
 # ---------------------------------------------------------------------------
 # Secrets & config
 # ---------------------------------------------------------------------------
 app.secret_key = os.environ["SECRET_KEY"]
-NA_LOGIN_PASSWORD = os.environ["NA_LOGIN_PASSWORD"]
-LU_LOGIN_PASSWORD = os.environ["LU_LOGIN_PASSWORD"]
+# Wichtig: Diese Variablen enthalten jetzt gehashte Passwörter (werkzeug
+# generate_password_hash), keine Klartext-Passwörter mehr! Siehe
+# generate_password_hash.py, um die Hashes zu erzeugen und in Render/​.env
+# einzutragen.
+NA_LOGIN_PASSWORD_HASH = os.environ["NA_LOGIN_PASSWORD_HASH"]
+LU_LOGIN_PASSWORD_HASH = os.environ["LU_LOGIN_PASSWORD_HASH"]
+# Separates Admin-Passwort fürs /admin-Panel. Nur zusammen mit user="nathan"
+# gültig - siehe admin_login(). Genau wie die anderen: Hash, kein Klartext.
+ADMIN_PASSWORD_HASH = os.environ["ADMIN_PASSWORD_HASH"]
 app.config["MAX_CONTENT_LENGTH"] = 16 * 1024 * 1024  # 16 MB limitL
 VAPID_PUBLIC_KEY = os.environ.get("VAPID_PUBLIC_KEY", "").strip()
 
@@ -62,6 +77,16 @@ STORAGE_BUCKET = os.environ.get("SUPABASE_BUCKET", "images")
 
 ALLOWED_EXTENSIONS = {"png", "jpg", "jpeg", "gif", "heic"}
 
+# ---------------------------------------------------------------------------
+# Rate limiting (v.a. gegen Brute-Force auf /login)
+# ---------------------------------------------------------------------------
+limiter = Limiter(
+    get_remote_address,
+    app=app,
+    default_limits=[],  # nur dort limitieren, wo explizit @limiter.limit(...) steht
+    storage_uri="memory://",  # reicht für eine Zwei-Personen-App auf einer Instanz
+)
+
 
 def allowed_file(filename):
     return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
@@ -69,6 +94,88 @@ def allowed_file(filename):
 
 def is_logged_in():
     return session.get("logged_in", False)
+
+
+def is_admin():
+    # Doppelt geprüft: sowohl das Admin-Flag als auch dass es wirklich Nathans
+    # Session ist (falls sich jemals jemand anderes als "nathan" einloggen könnte).
+    return bool(session.get("is_admin")) and session.get("user") == "nathan"
+
+
+def admin_required(view):
+    """
+    Schützt Admin-Routen. Ohne gültige Admin-Session gibt es einen 404 -
+    absichtlich KEIN 401/403, damit die Existenz des Panels nach außen nicht
+    erkennbar ist (sieht aus wie jede andere nicht existierende Seite).
+    """
+    @wraps(view)
+    def wrapped(*args, **kwargs):
+        if not is_admin():
+            abort(404)
+        return view(*args, **kwargs)
+    return wrapped
+
+
+# ---------------------------------------------------------------------------
+# Wartungsmodus - Zustand liegt in Supabase (app_settings), damit er Neustarts
+# der App übersteht. Tabelle muss einmalig angelegt werden, siehe README-Hinweis.
+# ---------------------------------------------------------------------------
+DEFAULT_MAINTENANCE_MESSAGE = "Wir sind gerade kurz mit Wartungsarbeiten beschäftigt. Schau gleich nochmal vorbei! 💕"
+
+
+def get_maintenance_state():
+    """Liest (enabled, message) in einem Rutsch aus app_settings."""
+    enabled = False
+    message = DEFAULT_MAINTENANCE_MESSAGE
+    try:
+        res = (
+            supabase.table("app_settings")
+            .select("key, value")
+            .in_("key", ["maintenance_mode", "maintenance_message"])
+            .execute()
+        )
+        data = {row["key"]: row["value"] for row in (res.data or [])}
+        enabled = data.get("maintenance_mode") == "true"
+        if data.get("maintenance_message"):
+            message = data["maintenance_message"]
+    except Exception as e:
+        # Falls die Tabelle fehlt oder Supabase kurz nicht erreichbar ist:
+        # sicherheitshalber NICHT die ganze Seite blockieren.
+        print(f"Failed to read maintenance state: {e}")
+        app.logger.error(f"Failed to read maintenance state: {e}")
+    print(f"Maintenance mode: {'enabled' if enabled else 'disabled'}, message: {message}")
+    return enabled, message
+
+
+def set_maintenance_state(enabled, message):
+    supabase.table("app_settings").upsert({
+        "key": "maintenance_mode",
+        "value": "true" if enabled else "false",
+    }).execute()
+    supabase.table("app_settings").upsert({
+        "key": "maintenance_message",
+        "value": message or DEFAULT_MAINTENANCE_MESSAGE,
+    }).execute()
+
+
+MAINTENANCE_EXEMPT_PREFIXES = ("/admin", "/static", "/ping", "/sw.js")
+
+
+@app.before_request
+def maintenance_gate():
+    print(f"Checking maintenance mode for path: {request.path}")
+    # Admin (Nathan, eingeloggt im Panel) umgeht den Wartungsmodus immer -
+    # das ist das "sudo" für den Rest der Seite.
+    if is_admin():
+        print("Admin user detected, bypassing maintenance mode.")
+        return
+    if request.path.startswith(MAINTENANCE_EXEMPT_PREFIXES):
+        return
+
+    enabled, message = get_maintenance_state()
+    if enabled:
+        print(f"Maintenance mode active. Showing maintenance page with message: {message}")
+        return render_template("maintenance.html", message=message), 503
 
 
 @app.context_processor
@@ -116,10 +223,12 @@ def process_and_upload_image(file):
             lqip_buffer.getvalue()
         ).decode("utf-8")
     except Exception as e:
-        # Fallback: upload the raw stream unmodified if Pillow processing fails
-        file.seek(0)
-        main_bytes = file.read()
-        app.logger.error(f"Image processing failed, uploading raw file. Error: {e}")
+        # Sicherheitsfix: Wenn Pillow die Datei nicht als echtes Bild lesen kann,
+        # NICHT mehr ungeprüft hochladen (vorher: raw bytes mit "image/jpeg"-Header
+        # in den Storage geschoben, obwohl der Inhalt gar kein validiertes Bild war).
+        # Stattdessen Upload sauber abbrechen, Aufrufer muss das behandeln.
+        app.logger.error(f"Image processing failed, rejecting upload. Error: {e}")
+        return None, None, None
 
     storage_path = unique_name
     supabase.storage.from_(STORAGE_BUCKET).upload(
@@ -146,17 +255,25 @@ def serve_sw():
 
 
 @app.route("/login", methods=["GET", "POST"])
+@limiter.limit("5 per 15 minutes", methods=["POST"])
 def login():
     if request.method == "POST":
-        password = request.form["password"]
+        password = request.form.get("password", "")
         user = request.form.get("user", None)
-        if (user == "nathan" and password == NA_LOGIN_PASSWORD) or (user == "luisa" and password == LU_LOGIN_PASSWORD):
+
+        # check_password_hash vergleicht gegen den gespeicherten Hash (PBKDF2/scrypt,
+        # je nach werkzeug-Version) und ist selbst schon timing-safe. Das Klartext-
+        # Passwort landet damit nie mehr im Vergleich mit einem anderen Klartext.
+        valid_nathan = user == "nathan" and check_password_hash(NA_LOGIN_PASSWORD_HASH, password)
+        valid_luisa = user == "luisa" and check_password_hash(LU_LOGIN_PASSWORD_HASH, password)
+
+        if valid_nathan or valid_luisa:
             session["logged_in"] = True
             session["user"] = user
             session.permanent = True
             return redirect(url_for("index"))
         else:
-                                    return render_template("login.html", error="Ungültige Anmeldedaten. Bitte versuche es erneut.")
+            return render_template("login.html", error="Ungültige Anmeldedaten. Bitte versuche es erneut.")
     return render_template("login.html")
 
 
@@ -164,6 +281,97 @@ def login():
 def logout():
     session.clear()
     return redirect(url_for("login"))
+
+
+# ---------------------------------------------------------------------------
+# Admin-Bereich (nur Nathan). /admin/login ist die einzige Tür rein; jede
+# andere /admin*-Route gibt ohne gültige Admin-Session einen 404 zurück statt
+# auf den Login umzuleiten, damit das Panel nach außen nicht sichtbar ist.
+# ---------------------------------------------------------------------------
+@app.route("/admin/login", methods=["GET", "POST"])
+@limiter.limit("5 per 15 minutes", methods=["POST"])
+def admin_login():
+    if is_admin():
+        return redirect(url_for("admin_panel"))
+
+    if request.method == "POST":
+        password = request.form.get("password", "")
+
+        if check_password_hash(ADMIN_PASSWORD_HASH, password):
+            session["logged_in"] = True
+            session["user"] = "nathan"
+            session["is_admin"] = True
+            session.permanent = True
+            return redirect(url_for("admin_panel"))
+        else:
+            return render_template("admin_login.html", error="Falsches Admin-Passwort.")
+    return render_template("admin_login.html")
+
+
+def get_admin_stats():
+    stats = {"entries": 0, "chat_messages": 0, "push_subscriptions": 0}
+    try:
+        res = supabase.table("journal_entry").select("id", count="exact").execute()
+        stats["entries"] = res.count or 0
+    except Exception as e:
+        app.logger.error(f"Admin stats: failed to count entries: {e}")
+    try:
+        res = supabase.table("chat_messages").select("id", count="exact").execute()
+        stats["chat_messages"] = res.count or 0
+    except Exception as e:
+        app.logger.error(f"Admin stats: failed to count chat messages: {e}")
+    try:
+        res = supabase.table("push_subscriptions").select("id", count="exact").execute()
+        stats["push_subscriptions"] = res.count or 0
+    except Exception as e:
+        app.logger.error(f"Admin stats: failed to count push subscriptions: {e}")
+    return stats
+
+
+@app.route("/admin")
+@admin_required
+def admin_panel():
+    maintenance_enabled, maintenance_message = get_maintenance_state()
+    return render_template(
+        "admin.html",
+        stats=get_admin_stats(),
+        maintenance_enabled=maintenance_enabled,
+        maintenance_message=maintenance_message,
+    )
+
+
+@app.route("/admin/maintenance/toggle", methods=["POST"])
+@admin_required
+def admin_maintenance_toggle():
+    enabled = request.form.get("enabled") == "on"
+    message = request.form.get("message", "").strip()
+    try:
+        set_maintenance_state(enabled, message)
+    except Exception as e:
+        app.logger.error(f"Failed to update maintenance state: {e}")
+    return redirect(url_for("admin_panel"))
+
+
+@app.route("/admin/chat/clear", methods=["POST"])
+@admin_required
+def admin_clear_chat():
+    try:
+        # Supabase verlangt für DELETE einen Filter - "id größer als 0" trifft
+        # (bei einer normalen auto-increment ID-Spalte) auf alle Zeilen zu.
+        supabase.table("chat_messages").delete().gt("id", 0).execute()
+    except Exception as e:
+        app.logger.error(f"Failed to clear chat messages: {e}")
+    return redirect(url_for("admin_panel"))
+
+
+@app.route("/admin/push/clear", methods=["POST"])
+@admin_required
+def admin_clear_push():
+    try:
+        supabase.table("push_subscriptions").delete().gt("id", 0).execute()
+    except Exception as e:
+        app.logger.error(f"Failed to clear push subscriptions: {e}")
+    return redirect(url_for("admin_panel"))
 
 
 def compute_highlight_score(entry: dict, seed_date: date) -> float:
@@ -476,6 +684,10 @@ def add_entry():
         file = request.files["media"]
         if file and file.filename and allowed_file(file.filename):
             image_url, storage_path, img_placeholder_str = process_and_upload_image(file)
+            if image_url is None:
+                # Datei hatte eine erlaubte Endung, war aber kein echtes Bild
+                # (z.B. manipuliert/beschädigt) -> Eintrag NICHT anlegen.
+                return handle_error(400)
 
     # Save to database using Supabase API insert
     try:
@@ -535,10 +747,15 @@ def edit_entry(entry_id):
     if "media" in request.files:
         file = request.files["media"]
         if file and file.filename and allowed_file(file.filename):
-            # Clean up old image in Supabase Storage
+            image_url, storage_path, img_placeholder_str = process_and_upload_image(file)
+            if image_url is None:
+                # Ungültiges Bild -> altes Bild NICHT löschen, Update abbrechen.
+                return handle_error(400)
+
+            # Erst jetzt, nachdem das neue Bild erfolgreich validiert & hochgeladen
+            # wurde, das alte Bild aus dem Storage entfernen.
             delete_image_from_storage(entry.get("storage_path"))
 
-            image_url, storage_path, img_placeholder_str = process_and_upload_image(file)
             update_data["image_url"] = image_url
             update_data["storage_path"] = storage_path
             update_data["img_placeholder_str"] = img_placeholder_str

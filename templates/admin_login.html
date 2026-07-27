@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="de" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Login</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body {
+            margin: 0;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #12141a;
+        }
+        .admin-login-card {
+            background: #1b1e27;
+            border: 1px solid #2a2e3a;
+            border-radius: var(--radius-lg, 16px);
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.4);
+            width: 100%;
+            max-width: 360px;
+            padding: 2.5rem 2rem;
+            text-align: center;
+        }
+        .admin-login-icon {
+            color: #ff8a4c;
+            font-size: 2rem;
+            margin-bottom: 0.75rem;
+        }
+        .admin-login-title {
+            color: #f4f5f7;
+            font-size: 1.3rem;
+            font-weight: 700;
+            margin-bottom: 0.25rem;
+        }
+        .admin-login-subtitle {
+            color: #8b909e;
+            font-size: 0.85rem;
+            margin-bottom: 1.5rem;
+        }
+        .admin-login-card form {
+            text-align: left;
+        }
+        .admin-login-card label {
+            display: block;
+            color: #8b909e;
+            font-size: 0.8rem;
+            margin-bottom: 0.35rem;
+        }
+        .admin-login-card input {
+            width: 100%;
+            box-sizing: border-box;
+            padding: 0.75rem 1rem;
+            border-radius: 10px;
+            border: 1px solid #2a2e3a;
+            background: #12141a;
+            color: #f4f5f7;
+            font-size: 0.95rem;
+            margin-bottom: 1.25rem;
+        }
+        .admin-login-card input:focus {
+            outline: none;
+            border-color: #ff8a4c;
+        }
+        .admin-login-btn {
+            width: 100%;
+            padding: 0.8rem;
+            border: none;
+            border-radius: 10px;
+            background: #ff8a4c;
+            color: #12141a;
+            font-weight: 700;
+            font-size: 0.95rem;
+            cursor: pointer;
+        }
+        .admin-login-btn:hover {
+            filter: brightness(1.05);
+        }
+        .admin-login-error {
+            background: rgba(255, 82, 82, 0.12);
+            border: 1px solid rgba(255, 82, 82, 0.3);
+            color: #ff8a8a;
+            padding: 0.6rem;
+            border-radius: 8px;
+            font-size: 0.85rem;
+            margin-bottom: 1.25rem;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="admin-login-card">
+        <div class="admin-login-icon"><i class="fa-solid fa-user-shield"></i></div>
+        <div class="admin-login-title">Admin-Zugang</div>
+        <div class="admin-login-subtitle">Nur für Nathan</div>
+
+        {% if error %}
+        <div class="admin-login-error"><i class="fa-solid fa-triangle-exclamation"></i> {{ error }}</div>
+        {% endif %}
+
+        <form method="POST">
+            <label for="password">Admin-Passwort</label>
+            <input
+                type="password"
+                id="password"
+                name="password"
+                placeholder="••••••••"
+                required
+                autofocus
+                autocomplete="current-password"
+            >
+            <button type="submit" class="admin-login-btn">
+                Einloggen <i class="fa-solid fa-arrow-right-to-bracket"></i>
+            </button>
+        </form>
+    </div>
+</body>
+</html>

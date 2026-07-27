@@ -410,12 +410,12 @@ function loadEntries() {
                     if (isGallery) {
                         imgHTML = `
                         <div class="card-image-wrapper" ${placeholderStyle}>
-                            <img data-src="${entry.image_url}" alt="${entry.title}" style="opacity: 0; transition: opacity 0.5s ease; width:100%; height:100%; object-fit:cover;" onload="this.style.opacity='1'; this.parentElement.style.filter='none';" onerror="this.style.opacity='1'; this.parentElement.style.filter='none'; this.classList.add('image-error');">
+                            <img data-src="${entry.image_url}" alt="${escapeHtml(entry.title)}" style="opacity: 0; transition: opacity 0.5s ease; width:100%; height:100%; object-fit:cover;" onload="this.style.opacity='1'; this.parentElement.style.filter='none';" onerror="this.style.opacity='1'; this.parentElement.style.filter='none'; this.classList.add('image-error');">
                         </div>`;
                     } else {
                         imgHTML = `
                         <div class="card-image-wrapper" ${placeholderStyle}>
-                            <img src="${entry.image_url}" alt="${entry.title}" style="opacity: 0; transition: opacity 0.5s ease; width:100%; height:100%; object-fit:cover;" onload="this.style.opacity='1'; this.parentElement.style.filter='none';" onerror="this.style.opacity='1'; this.parentElement.style.filter='none'; this.classList.add('image-error');">
+                            <img src="${entry.image_url}" alt="${escapeHtml(entry.title)}" style="opacity: 0; transition: opacity 0.5s ease; width:100%; height:100%; object-fit:cover;" onload="this.style.opacity='1'; this.parentElement.style.filter='none';" onerror="this.style.opacity='1'; this.parentElement.style.filter='none'; this.classList.add('image-error');">
                         </div>`;
                     }
                 }
@@ -429,7 +429,7 @@ function loadEntries() {
                         ${imgHTML}
                         <div class="card-content">
                             <div class="card-header-flex">
-                                <h4 class="card-title">${entry.title}</h4>
+                                <h4 class="card-title">${escapeHtml(entry.title)}</h4>
                                 <span class="card-date">${formatDateForDisplay(entry.date)}</span>
                             </div>
                             ${timeAgoHTML ? `<div style="margin-top: var(--space-2);">${timeAgoHTML}</div>` : ''}

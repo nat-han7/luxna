@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="de" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Panel</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body {
+            margin: 0;
+            background: #0f1117;
+            color: #eef0f4;
+        }
+        .admin-shell {
+            max-width: 880px;
+            margin: 0 auto;
+            padding: 2rem 1.25rem 4rem;
+        }
+        .admin-topbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 2rem;
+            flex-wrap: wrap;
+            gap: 1rem;
+        }
+        .admin-topbar h1 {
+            font-size: 1.4rem;
+            margin: 0;
+            display: flex;
+            align-items: center;
+            gap: 0.6rem;
+        }
+        .admin-badge {
+            background: rgba(255, 138, 76, 0.15);
+            color: #ff8a4c;
+            border: 1px solid rgba(255, 138, 76, 0.3);
+            padding: 0.3rem 0.75rem;
+            border-radius: 999px;
+            font-size: 0.75rem;
+            font-weight: 700;
+        }
+        .admin-topbar-links {
+            display: flex;
+            gap: 1.25rem;
+            align-items: center;
+        }
+        .admin-topbar-links a {
+            color: #8b909e;
+            text-decoration: none;
+            font-size: 0.85rem;
+        }
+        .admin-topbar-links a:hover {
+            color: #eef0f4;
+        }
+
+        .admin-card {
+            background: #171a22;
+            border: 1px solid #262b38;
+            border-radius: 14px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+        .admin-card h2 {
+            font-size: 1.05rem;
+            margin: 0 0 1rem 0;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .admin-card h2 i {
+            color: #ff8a4c;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 1rem;
+        }
+        .stat-box {
+            background: #0f1117;
+            border: 1px solid #262b38;
+            border-radius: 10px;
+            padding: 1rem;
+            text-align: center;
+        }
+        .stat-value {
+            font-size: 1.6rem;
+            font-weight: 700;
+            color: #ff8a4c;
+        }
+        .stat-label {
+            font-size: 0.75rem;
+            color: #8b909e;
+            margin-top: 0.25rem;
+        }
+
+        .maintenance-status {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            padding: 0.3rem 0.75rem;
+            border-radius: 999px;
+            font-size: 0.8rem;
+            font-weight: 700;
+            margin-bottom: 1rem;
+        }
+        .maintenance-status.on {
+            background: rgba(255, 82, 82, 0.15);
+            color: #ff8a8a;
+            border: 1px solid rgba(255, 82, 82, 0.3);
+        }
+        .maintenance-status.off {
+            background: rgba(80, 220, 150, 0.12);
+            color: #6ee7ab;
+            border: 1px solid rgba(80, 220, 150, 0.3);
+        }
+
+        .admin-form label {
+            display: block;
+            font-size: 0.8rem;
+            color: #8b909e;
+            margin-bottom: 0.35rem;
+        }
+        .admin-form textarea {
+            width: 100%;
+            box-sizing: border-box;
+            padding: 0.7rem 0.9rem;
+            border-radius: 8px;
+            border: 1px solid #262b38;
+            background: #0f1117;
+            color: #eef0f4;
+            font-size: 0.9rem;
+            margin-bottom: 1rem;
+            font-family: inherit;
+            resize: vertical;
+        }
+        .admin-form textarea:focus {
+            outline: none;
+            border-color: #ff8a4c;
+        }
+        .toggle-row {
+            display: flex;
+            align-items: center;
+            gap: 0.6rem;
+            margin-bottom: 1rem;
+        }
+        .toggle-row input {
+            width: 18px;
+            height: 18px;
+        }
+        .toggle-row label {
+            margin: 0;
+            color: #eef0f4;
+            font-size: 0.9rem;
+        }
+
+        .btn {
+            border: none;
+            border-radius: 8px;
+            padding: 0.7rem 1.2rem;
+            font-weight: 700;
+            font-size: 0.85rem;
+            cursor: pointer;
+        }
+        .btn-primary {
+            background: #ff8a4c;
+            color: #0f1117;
+        }
+        .btn-primary:hover {
+            filter: brightness(1.05);
+        }
+        .btn-danger {
+            background: rgba(255, 82, 82, 0.15);
+            color: #ff8a8a;
+            border: 1px solid rgba(255, 82, 82, 0.35);
+        }
+        .btn-danger:hover {
+            background: rgba(255, 82, 82, 0.25);
+        }
+
+        .danger-zone {
+            border-color: rgba(255, 82, 82, 0.3);
+        }
+        .danger-actions {
+            display: flex;
+            gap: 0.75rem;
+            flex-wrap: wrap;
+        }
+        .danger-note {
+            color: #8b909e;
+            font-size: 0.8rem;
+            margin-bottom: 1rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="admin-shell">
+        <div class="admin-topbar">
+            <h1><i class="fa-solid fa-user-shield"></i> Admin Panel <span class="admin-badge">sudo</span></h1>
+            <div class="admin-topbar-links">
+                <a href="/"><i class="fa-solid fa-house"></i> Zur normalen Seite</a>
+                <a href="/logout"><i class="fa-solid fa-arrow-right-from-bracket"></i> Abmelden</a>
+            </div>
+        </div>
+
+        <div class="admin-card">
+            <h2><i class="fa-solid fa-chart-simple"></i> Übersicht</h2>
+            <div class="stats-grid">
+                <div class="stat-box">
+                    <div class="stat-value">{{ stats.entries }}</div>
+                    <div class="stat-label">Erinnerungen</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-value">{{ stats.chat_messages }}</div>
+                    <div class="stat-label">Chat-Nachrichten</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-value">{{ stats.push_subscriptions }}</div>
+                    <div class="stat-label">Push-Abos</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="admin-card">
+            <h2><i class="fa-solid fa-screwdriver-wrench"></i> Wartungsmodus</h2>
+
+            <span class="maintenance-status {{ 'on' if maintenance_enabled else 'off' }}">
+                <i class="fa-solid {{ 'fa-triangle-exclamation' if maintenance_enabled else 'fa-circle-check' }}"></i>
+                {{ 'Aktiv - Luisa sieht die Wartungsseite' if maintenance_enabled else 'Inaktiv - Seite läuft normal' }}
+            </span>
+
+            <form class="admin-form" method="POST" action="{{ url_for('admin_maintenance_toggle') }}">
+                <div class="toggle-row">
+                    <input type="checkbox" id="enabled" name="enabled" {{ 'checked' if maintenance_enabled else '' }}>
+                    <label for="enabled">Wartungsmodus aktivieren</label>
+                </div>
+                <label for="message">Nachricht für Besucher</label>
+                <textarea id="message" name="message" rows="3">{{ maintenance_message }}</textarea>
+                <button type="submit" class="btn btn-primary">
+                    Speichern <i class="fa-solid fa-check"></i>
+                </button>
+            </form>
+        </div>
+
+        <div class="admin-card danger-zone">
+            <h2><i class="fa-solid fa-radiation" style="color:#ff8a8a;"></i> Danger Zone</h2>
+            <p class="danger-note">Diese Aktionen lassen sich nicht rückgängig machen.</p>
+            <div class="danger-actions">
+                <form method="POST" action="{{ url_for('admin_clear_chat') }}"
+                      onsubmit="return confirm('Wirklich ALLE Chat-Nachrichten unwiderruflich löschen?');">
+                    <button type="submit" class="btn btn-danger">
+                        Chat-Verlauf löschen <i class="fa-solid fa-trash"></i>
+                    </button>
+                </form>
+                <form method="POST" action="{{ url_for('admin_clear_push') }}"
+                      onsubmit="return confirm('Wirklich ALLE Push-Abos entfernen? Beide Geräte müssten sich neu registrieren.');">
+                    <button type="submit" class="btn btn-danger">
+                        Alle Push-Abos entfernen <i class="fa-solid fa-bell-slash"></i>
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
