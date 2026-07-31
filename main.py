@@ -697,7 +697,8 @@ def add_entry():
             "date": date,
             "image_url": image_url,
             "storage_path": storage_path,
-            "img_placeholder_str": img_placeholder_str
+            "img_placeholder_str": img_placeholder_str,
+            "created_by": current_user
         }).execute()
         current_user = session.get("user")
         partner = get_other_user(current_user)
