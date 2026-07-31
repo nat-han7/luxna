@@ -466,7 +466,6 @@ function loadEntries() {
             container.innerHTML = `<p style="text-align:center; color:var(--text-muted); width:100%; padding: var(--space-4);">Die Erinnerungen konnten gerade nicht geladen werden. Bitte lade die Seite neu.</p>`;
         });
 }
-
 function openDetailModal(entry) {
     currentSelectedEntry = entry;
     document.getElementById('detail-title').textContent = entry.title;
@@ -474,6 +473,24 @@ function openDetailModal(entry) {
     document.getElementById('detail-text').textContent = entry.text;
     updateReminderButtonLabel();
     
+    // --- Ersteller (created_by) befüllen & anzeigen ---
+    const createdByEl = document.getElementById('detail-createdby');
+    const createdByTextEl = document.getElementById('detail-createdby-text');
+    
+    if (createdByEl) {
+        if (entry.created_by) {
+            if (createdByTextEl) {
+                createdByTextEl.textContent = `Erstellt von ${entry.created_by}`;
+            } else {
+                createdByEl.textContent = `Erstellt von ${entry.created_by}`;
+            }
+            createdByEl.style.display = 'inline-flex';
+        } else {
+            // Ausblenden, falls bei älteren Einträgen kein Ersteller vorhanden ist
+            createdByEl.style.display = 'none';
+        }
+    }
+
     const imgContainer = document.getElementById('detail-image-container');
     
     if (entry.image_url) {
