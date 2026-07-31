@@ -367,6 +367,36 @@ body {
     flex-wrap: wrap;
 }
 
+/* =========================================================
+   Detail View — Created By Badge
+   ========================================================= */
+.detail-createdby {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    background: var(--bg-main);
+    border: 1px solid var(--border-color);
+    padding: 0.4rem 0.85rem;
+    border-radius: var(--radius-lg);
+    margin-bottom: var(--space-4);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.02);
+    transition: all 0.3s ease;
+}
+
+.detail-createdby .createdby-icon {
+    color: var(--accent);
+    font-size: 0.95rem;
+}
+
+/* Dunkles Theme Finetuning */
+[data-theme="dark"] .detail-createdby {
+    background: rgba(255, 255, 255, 0.03);
+    border-color: var(--border-color);
+}
+
 .modal-header {
     display: flex;
     justify-content: space-between;
