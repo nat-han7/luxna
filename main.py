@@ -526,6 +526,97 @@ def get_other_user(username):
     return None
 
 
+# ---------------------------------------------------------------------------
+# Online-Status ("Presence") - kein echtes Websocket-Setup, sondern ein
+# leichtgewichtiges Polling: das Frontend "pingt" alle ~20s, wir speichern
+# den Zeitstempel in app_settings (gleiche Tabelle wie Wartungsmodus) und
+# gelten als "online", solange der letzte Ping nicht zu lange her ist.
+# ---------------------------------------------------------------------------
+PRESENCE_ONLINE_THRESHOLD_SECONDS = 45
+
+
+def presence_key(username):
+    return f"presence_last_seen_{username}"
+
+
+def update_presence(username):
+    try:
+        supabase.table("app_settings").upsert({
+            "key": presence_key(username),
+            "value": datetime.utcnow().isoformat() + "Z",
+        }).execute()
+    except Exception as e:
+        app.logger.error(f"Failed to update presence for {username}: {e}")
+
+
+def get_last_seen(username):
+    try:
+        res = (
+            supabase.table("app_settings")
+            .select("value")
+            .eq("key", presence_key(username))
+            .execute()
+        )
+        if res.data:
+            return res.data[0].get("value")
+    except Exception as e:
+        app.logger.error(f"Failed to read presence for {username}: {e}")
+    return None
+
+
+def clear_presence(username):
+    """Löscht den Presence-Eintrag sofort, statt auf das Timeout zu warten -
+    wird aufgerufen, wenn der Tab/die App aktiv verlassen wird."""
+    try:
+        supabase.table("app_settings").delete().eq("key", presence_key(username)).execute()
+    except Exception as e:
+        app.logger.error(f"Failed to clear presence for {username}: {e}")
+
+
+def is_user_online(username):
+    if not username:
+        return False
+    last_seen = get_last_seen(username)
+    if not last_seen:
+        return False
+    try:
+        last_seen_dt = datetime.fromisoformat(last_seen.replace("Z", "+00:00"))
+        now = datetime.now(last_seen_dt.tzinfo)
+        return (now - last_seen_dt).total_seconds() <= PRESENCE_ONLINE_THRESHOLD_SECONDS
+    except Exception as e:
+        app.logger.error(f"Failed to parse presence timestamp for {username}: {e}")
+        return False
+
+
+@app.route("/api/presence/ping", methods=["POST"])
+def presence_ping():
+    """Wird vom Frontend regelmäßig aufgerufen: markiert den eingeloggten
+    User als 'online' und liefert gleichzeitig zurück, ob der Partner
+    gerade online ist - spart einen zweiten Request."""
+    if not is_logged_in():
+        return jsonify({"error": "Unauthorized"}), 401
+
+    current_user = session.get("user")
+    partner = get_other_user(current_user)
+
+    update_presence(current_user)
+    partner_online = is_user_online(partner)
+
+    return jsonify({"success": True, "partner_online": partner_online})
+
+
+@app.route("/api/presence/offline", methods=["POST"])
+def presence_offline():
+    """Wird per navigator.sendBeacon() beim Verlassen/Verstecken der Seite
+    aufgerufen, damit der Partner sofort 'offline' sieht statt erst nach
+    Ablauf des Presence-Timeouts."""
+    if not is_logged_in():
+        return jsonify({"error": "Unauthorized"}), 401
+
+    clear_presence(session.get("user"))
+    return jsonify({"success": True})
+
+
 def normalize_chat_message_row(row):
     row = dict(row)
     row["is_self"] = row.get("sender") == session.get("user")

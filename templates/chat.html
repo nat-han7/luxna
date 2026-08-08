@@ -43,6 +43,24 @@
     .chat-title {
         font-size: 1.4rem;
         margin-bottom: 4px;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .chat-online-dot {
+        display: inline-block;
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        background: #c6cad3;
+        transition: background-color 0.3s ease, box-shadow 0.3s ease;
+        flex-shrink: 0;
+    }
+
+    .chat-online-dot.is-online {
+        background: #34c77b;
+        box-shadow: 0 0 0 3px rgba(52, 199, 123, 0.18);
     }
 
     .chat-subtitle {
@@ -232,7 +250,10 @@
         <header class="chat-header">
             <div>
                 <div class="chat-kicker">Private Unterhaltung</div>
-                <h2 class="chat-title">Chat mit {{ 'Luisa' if chat_partner == 'luisa' else 'Nathan' }}</h2>
+                <h2 class="chat-title">
+                    Chat mit {{ 'Luisa' if chat_partner == 'luisa' else 'Nathan' }}
+                    <span id="chat-partner-status" class="chat-online-dot" title="Status wird geladen..."></span>
+                </h2>
             </div>
         </header>
 

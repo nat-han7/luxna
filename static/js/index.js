@@ -1211,6 +1211,62 @@ function initChatBadgePolling() {
     chatUnreadInterval = setInterval(checkUnreadChatCount, 5000);
 }
 
+// --- Online-Status des Partners ---------------------------------------
+let presencePingInterval = null;
+
+function updatePresenceUI(isOnline) {
+    const dot = document.getElementById('chat-partner-status');
+    if (!dot) return;
+    dot.classList.toggle('is-online', isOnline);
+    dot.title = isOnline ? 'Gerade online' : 'Gerade nicht online';
+}
+
+async function pingPresence() {
+    try {
+        const response = await fetch('/api/presence/ping', { method: 'POST' });
+        if (!response.ok) return;
+        const data = await response.json();
+        updatePresenceUI(!!data.partner_online);
+    } catch (error) {
+        console.warn('Presence-Ping fehlgeschlagen:', error);
+    }
+}
+
+function initPresence() {
+    if (!window.currentUser) return;
+
+    pingPresence();
+    presencePingInterval = setInterval(pingPresence, 20000);
+
+    // Sofort neu pingen, sobald der Tab wieder aktiv wird (z.B. nach
+    // längerer Inaktivität im Hintergrund), statt bis zu 20s zu warten.
+    // Sobald die Seite versteckt wird (Tab-Wechsel, App minimiert,
+    // Handy gesperrt), sofort "offline" melden statt auf das Timeout zu
+    // warten - sendBeacon funktioniert zuverlässig auch dann noch, wenn
+    // ein normaler fetch()-Request evtl. abgebrochen würde.
+    document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') {
+            pingPresence();
+        } else {
+            signalOffline();
+        }
+    });
+
+    // Zusätzliches Netz: pagehide feuert zuverlässiger als beforeunload,
+    // z.B. beim Schließen des Tabs oder Wechsel zu einer anderen App auf iOS.
+    window.addEventListener('pagehide', signalOffline);
+}
+
+function signalOffline() {
+    if (!window.currentUser) return;
+    if (navigator.sendBeacon) {
+        navigator.sendBeacon('/api/presence/offline');
+    } else {
+        // Fallback für sehr alte Browser ohne sendBeacon-Support
+        fetch('/api/presence/offline', { method: 'POST', keepalive: true }).catch(() => {});
+    }
+}
+
 function initBottomNavActiveState() {
     const currentPath = window.location.pathname;
     const items = document.querySelectorAll('.bottom-nav-item');
@@ -1242,6 +1298,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initPushNotifications();
     initChatPage();
     initChatBadgePolling();
+    initPresence();
     initBottomNavActiveState();
     initPWAInstallPrompt();
 
@@ -1292,5 +1349,8 @@ window.addEventListener('beforeunload', () => {
     }
     if (chatUnreadInterval) {
         clearInterval(chatUnreadInterval);
+    }
+    if (presencePingInterval) {
+        clearInterval(presencePingInterval);
     }
 });
